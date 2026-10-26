@@ -11,7 +11,7 @@ public delegate Task<string?> SecretSource(string name, CancellationToken ct);
 /// <summary>Azure Key Vault, read as the signed-in Azure user. Nothing is written to disk.</summary>
 public static class KeyVault
 {
-    public static readonly Uri DefaultVault = new(AppSettings.Choice("POAUTOROBO_VAULT", "https://kv-poshared.vault.azure.net/"));
+    public static readonly Uri DefaultVault = new(AppSettings.Choice("POAUTOROBO_VAULT", "https://kv-poshared2.vault.azure.net/"));
 
     /// <summary>The app's own vault, read as the user signed in with <c>az login</c>.</summary>
     public static SecretSource Default() => Reader(DefaultVault, AppSettings.SignedInUser);
