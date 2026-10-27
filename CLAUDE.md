@@ -20,6 +20,7 @@ dotnet test PoAutoRobo.slnx --filter "Category!=Integration&Category!=Live"   # 
 dotnet test PoAutoRobo.slnx --filter "Category=Integration"                   # run FFmpeg and Edge for real
 dotnet format PoAutoRobo.slnx --verify-no-changes                             # CI runs this first
 dotnet test PoAutoRobo.slnx --filter "FullyQualifiedName~FfmpegArgsTests"     # one class, or one test by its name
+dotnet publish src\PoAutoRobo.App -p:PublishProfile=Release                   # self-contained ReadyToRun build in bin\publish
 ```
 
 To run the app, start the built exe; its path is in `AGENTS.md`.
@@ -38,10 +39,11 @@ Warnings are errors, analyzer and style rules included, and so is a package with
   - `Pictures`: whatever a clip shows: generated pictures, AI video, stock photos, code-drawn scenes.
   - `Render`: FFmpeg command lines, captions, the intro and outro, teasers, the builder that turns an episode into a video,
     the intro's swarm of light (`Swarm`), the video's made-up sounds (`Synth`) and the series' made-up logo and
-    mascot (`Emblem`), so every brand-kit choice left unset still has a default.
+    mascot (`Emblem`), so every brand-kit choice left unset still has a default. Also the publishing helpers:
+    YouTube upload (`YouTube`), thumbnails (`Thumbnails`) and the chapter list.
 - `src/PoAutoRobo.App`: the window (`MainWindow`, with `.Dialogs` and `.Taskbar` beside it). One view
   model, `MainViewModel`, in partial files by concern (`.Steps`, `.Library`, `.Footage`, `.Edits`, `.Pictures`,
-  `.Export`, `.Series`, `.Teasers`, `.Activity`); views in `Views/`. Five steps, Intro, Lesson, Clips, Preview and
+  `.Export`, `.Publish`, `.Series`, `.Teasers`, `.Activity`); views in `Views/`. Five steps, Intro, Lesson, Clips, Preview and
   Publish, each with a checklist under the header (`MainViewModel.Guide`); name a step by its constant
   (`MainViewModel.ClipsStep`), never its number.
 - `tests/PoAutoRobo.Core.Tests`: tests of the core. The app project has none.
@@ -52,12 +54,15 @@ Warnings are errors, analyzer and style rules included, and so is a package with
   line. The edits themselves are pure functions in `EpisodeEditor`; add one there, never mutate in the view model.
 - **`Episode`, `Clip` and `VisualSpec` are saved as JSON and read back strictly.** Add fields as optional parameters
   or `init` properties with a default. New `VisualKind`s and `Look`s go on the end of the enum.
-- **Media paths must be inside the episode folder.** `ProjectStore.KeepOwnMedia` drops any that are not, on load.
+- **Media paths must be full paths inside the episode folder.** `ProjectStore.KeepOwnMedia` drops any that are not
+  (relative and drive-relative ones included), on load. `FfmpegRunner` limits every FFmpeg and ffprobe input to files
+  and its own pipe, so a disguised playlist cannot reach the network.
   Anything new that holds a path (see `Clip.AllMedia`) must also be handled there, in `ProjectStore.Duplicate`, and in
   `EpisodeBuilder.UnusedMedia`. The brand kit is not an episode's: it keeps bare file names of its own copies in
   `%LOCALAPPDATA%\PoAutoRobo\series`, and its music is copied into an episode's `imports` when used there.
 - **Nothing that costs money happens without being asked for**, and a batch only after its cost is confirmed and
-  the monthly budget checked (`OverBudget`). Generated media is cached by everything that went into the request
+  the monthly budget checked (`OverBudget`). Spending with no episode open (the host, the logo) is logged in the host
+  folder and counts toward the month too; spending from deleted episodes does not. Generated media is cached by everything that went into the request
   (`MediaCache`), so asking again is free; a deliberate retry is a new *take* (`VisualSpec.Take`).
 - **Text that did not come from the user is fenced** before it reaches a model: repository passages and anything a
   model wrote earlier, such as the finished script teasers are cut from. Use `AzureScriptWriter.Fenced`; the prompts in `ScriptSchemas` say not to obey it.
@@ -68,10 +73,13 @@ Warnings are errors, analyzer and style rules included, and so is a package with
 - **A script is planned, then written a clip at a time, side by side** (`AzureScriptWriter.WriteClipsAsync`). Every
   clip's request opens with the plan's request word for word, so keep anything that varies by clip after it.
 - **Programs the app starts die with the job**: register `FfmpegRunner.Kill` on the cancellation token, as
-  `FfmpegRunner` and `SceneRenderer` do, so closing the window leaves nothing running.
+  `FfmpegRunner` and `SceneRenderer` do, so closing the window leaves nothing running. A small job outside a long one
+  (a poster, a preview) uses the view model's `_closing` token.
 - **Clips are joined by copying**, so the intro, the outro and every clip are encoded exactly alike (`FfmpegArgs.Encode`)
   and each picture runs exactly its slot on the timeline. Every slot has a sound file: narration, a film's own sound
-  (`FfmpegArgs.FootageSound`), the sting, or silence.
+  (`FfmpegArgs.FootageSound`), the sting, or silence. A clip's extra touches (glass strap, light streak, grain) go in
+  through `Polish` and are added in `FfmpegArgs.Finish`, alike for every clip and both bookends. A beat's opening clip
+  carries the whoosh, the streak and the strap together.
 
 - **Win2D draws only what has to be drawn**, the clips' strips and the timeline, with plain `CanvasControl`s and its
   own drawing: no shader package, no unsafe code, and no decorative light or sounds of the app's own. Movement (a card
@@ -81,8 +89,9 @@ Warnings are errors, analyzer and style rules included, and so is a package with
   made, so its value goes back to the standard one when advanced controls are turned off. Where that would undo the
   user's own setting (a caption size, the outro's length, a model's name), its control stays in view while it is set
   away from the standard instead (`Ui.ShowEither`).
-- **Choices remembered between runs live in Settings** (`Views/SettingsDialog`, saved in `Prefs`), not in a flyout of
-  their own. What every episode of the series shares (its look, its shape, its intro and outro) is the brand kit's,
+- **Choices remembered between runs live in Settings** (`Views/SettingsPanel`, in the side panel at the window's right,
+  saved in `Prefs`), not in a flyout of their own. Questions about money or publishing (`Confirm`, `ConfirmSpend`) stay
+  modal dialogs. What every episode of the series shares (its look, its shape, its intro and outro) is the brand kit's,
   set on the Intro step.
 
 ## Conventions
@@ -90,8 +99,8 @@ Warnings are errors, analyzer and style rules included, and so is a package with
 - Comments and messages are written in plain words for the person using the app, and say *why*. Match that voice.
 - Every control the pointer can rest on has a tooltip: in a sentence or three, what it does, when to use it and how,
   and whether it costs anything. A new control gets one in the same change.
-- Seams for tests are delegates (`JsonChat`, `SeeingChat`, `Hear`, `ImageMaker`, `RepoSource`, `Embed`, `FetchText`,
-  `SecretSource`), not interfaces, unless
+- Seams for tests are delegates (`JsonChat`, `SeeingChat`, `Hear`, `ImageMaker`, `RepoSource`, `Embed`, `Speak`,
+  `SecretSource`, `SendHttp`), not interfaces, unless
   there are two real implementations (`IScriptWriter`, `INarrator`).
 - Sizes and spacing used on more than one page are named in `App.xaml`; use the name, not the number.
 - A deliberate shortcut is marked `// ponytail:` with its ceiling and how to lift it.
@@ -120,3 +129,4 @@ these environment variables overrides a default, and a service's variable wins o
 | `POAUTOROBO_PEXELS_KEY` | Stock photo key, when not in the vault |
 | `POAUTOROBO_CHAT_RATES`, `POAUTOROBO_FAST_CHAT_RATES` | Dollars per million tokens as `input,cached,output`; unset means script use is shown unpriced |
 | `POAUTOROBO_VOICE_RATE` | Dollars per million characters spoken; unset means unpriced |
+| `POAUTOROBO_YOUTUBE_CLIENT_ID`, `POAUTOROBO_YOUTUBE_CLIENT_SECRET` | A Google OAuth client of the *Desktop app* kind for uploading, when not in the vault as `YouTube--ClientId`/`YouTube--ClientSecret`; unset means upload is off. Sign-in happens per upload and no token is kept |

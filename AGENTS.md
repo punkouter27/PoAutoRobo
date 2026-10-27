@@ -6,7 +6,7 @@ Where this file and `CLAUDE.md` disagree about the code, `CLAUDE.md` wins.
 ## 1. Branching and version control
 
 - **Master first.** Work on `master`. Use another branch only when asked to.
-- **Commits that sound human.** When asked to sync, make short commits worded in plain, casual American slang
+- **Commits that sound human.** When asked to commit or sync, make short commits worded in plain, casual American slang
   (no jargon, no file names), then push without asking again.
 
 ## 2. Running, testing and quality
@@ -16,7 +16,7 @@ Where this file and `CLAUDE.md` disagree about the code, `CLAUDE.md` wins.
   `dotnet build PoAutoRobo.slnx` then `src\PoAutoRobo.App\bin\Debug\net10.0-windows10.0.19041.0\<rid>\PoAutoRobo.App.exe`.
 - **Test only what changed.** Do not run the whole suite. Run the tests for the part you touched with
   `dotnet test PoAutoRobo.slnx --filter "FullyQualifiedName~<Name>"`, or none for a small edit such as wording.
-- **No warnings.** Warnings already stop the build (see `Directory.Build.props`); fix each one when it appears,
+- **No warnings.** Warnings already stop the build (`TreatWarningsAsErrors` in `Directory.Build.props`); fix each one when it appears,
   never silence it.
 
 ## 3. Architecture and configuration
@@ -36,7 +36,7 @@ Where this file and `CLAUDE.md` disagree about the code, `CLAUDE.md` wins.
   yet committed), in its bottom-right corner. It is stamped at build time from the last commit (today's date alone
   when git is not available); see `StampBuildVersion` in
   `src/PoAutoRobo.App/PoAutoRobo.App.csproj`. Keep it there.
-- **TL;DR.** End any reply longer than 100 words with a TL;DR of about 20 words.
+- **TL;DR.** End any reply longer than 100 words with a TL;DR of 20 words or fewer.
 - **Three-level summary.** After a code change of more than 20 lines, add three lines, one each:
   1. Toddler: the idea in one simple sentence.
   2. Child: what it now does, in one sentence.
