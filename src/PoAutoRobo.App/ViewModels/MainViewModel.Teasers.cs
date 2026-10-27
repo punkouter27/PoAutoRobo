@@ -99,6 +99,7 @@ public partial class MainViewModel
         if (teasers.Count == 0)
             throw new InvalidOperationException("None of the teasers kept fits in ten seconds of its clips. Move a moment to a longer clip, or suggest them again.");
         LastExport = await Task.Run(() => _builder.ExportTeasersAsync(episode, folder, teasers, captions, SeriesBrand, progress, ct), ct);
+        JsonFile.Save(Path.Combine(LastExport, HooksFile), teasers.Select(t => t.Hook).ToList()); // each Short's title, in the files' order
         SyncCards();
         var dropped = kept.Count - teasers.Count;
         StatusMessage = $"Saved {(teasers.Count == 1 ? "1 teaser" : $"{teasers.Count} teasers")} in export\\teasers."

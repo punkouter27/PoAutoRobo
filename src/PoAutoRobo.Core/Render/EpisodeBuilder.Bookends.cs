@@ -65,7 +65,7 @@ public sealed partial class EpisodeBuilder
     private const string MadeUpSting = "made-up sting 2", MadeUpOutro = "made-up outro 1";
 
     // Names the swarm in the clip cache. Change it when the swarm changes, so intros are drawn again.
-    private const string SwarmVersion = "swarm 1";
+    private const string SwarmVersion = "swarm 2";
 
     /// <summary>The most the swarm is drawn at; a larger frame has it enlarged, which its soft glow hides.</summary>
     private static readonly ExportPreset SwarmLimit = new(1280, 720, 30);
@@ -128,7 +128,7 @@ public sealed partial class EpisodeBuilder
         var look = new BookendLook(accent,
             SeriesKit.PathOf(brand.Folder, kit.Logo) ?? await MadeUpPictureAsync(logo: true, accent, work, ct),
             SeriesKit.PathOf(brand.Folder, kit.Mascot) ?? await MadeUpPictureAsync(logo: false, accent, work, ct),
-            kit.Layout);
+            kit.Layout, kit.Grain);
         IReadOnlyList<string> Args(string to) => intro
             ? FfmpegArgs.IntroVideo(look, File("channel")!, File("tagline"), File("title")!, length, preset, to)
             : FfmpegArgs.OutroVideo(look, File("channel")!, File("next"), length, preset, to);

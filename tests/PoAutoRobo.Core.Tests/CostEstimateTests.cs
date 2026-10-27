@@ -130,5 +130,14 @@ public sealed class CostEstimateTests : IDisposable
         Assert.Equal(0.96m, SpendLog.MonthTotal(_folder, DateTimeOffset.Now));
         Assert.Equal(0m, SpendLog.MonthTotal(_folder, DateTimeOffset.Now.AddMonths(2)));
         Assert.Equal(0m, SpendLog.MonthTotal(Path.Combine(_folder, "no-such-root"), DateTimeOffset.Now));
+        // Spending with no episode open (the host, a logo) is kept apart, and counts towards the month too.
+        var apart = Directory.CreateTempSubdirectory("poautorobo-host-").FullName;
+        SpendLog.Add(apart, SpendLog.Picture, 0.04m);
+        Assert.Equal(1.00m, SpendLog.MonthTotal(_folder, DateTimeOffset.Now, apart));
+        Directory.Delete(apart, recursive: true);
+
+        // A damaged line is skipped, not taken to mean nothing was spent, and a negative amount takes nothing off.
+        File.AppendAllText(Path.Combine(episode, SpendLog.FileName), "{ not json\n{\"When\":\"2026-01-01T00:00:00+00:00\",\"What\":\"refund\",\"Dollars\":-5}\n");
+        Assert.Equal(0.16m, SpendLog.Total(episode));
     }
 }

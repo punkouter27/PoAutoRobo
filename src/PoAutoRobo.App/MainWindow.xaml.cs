@@ -20,10 +20,6 @@ namespace PoAutoRobo.App;
 /// </summary>
 public sealed partial class MainWindow : WindowEx
 {
-    private readonly DispatcherTimer _roll = new() { Interval = TimeSpan.FromMilliseconds(30) };
-    private double _shownPercent;
-    private double _shownRuntime;
-    private double _shownSpent;
     private bool _inFront = true;
     private bool _toastsReady;
     private readonly DispatcherTimer _messageTimer = new() { Interval = TimeSpan.FromSeconds(10) };
@@ -39,7 +35,6 @@ public sealed partial class MainWindow : WindowEx
         ViewModel.JobFinished = OnJobFinished;
         ViewModel.PlayVideo = PlayVideo;
         ViewModel.PropertyChanged += OnViewModelChanged;
-        _roll.Tick += (_, _) => Roll();
         Activated += (_, e) => _inFront = e.WindowActivationState != WindowActivationState.Deactivated;
         // An outcome goes by itself once there has been time to read it; an error stays until it is closed.
         _messageTimer.Tick += (_, _) =>
@@ -67,43 +62,25 @@ public sealed partial class MainWindow : WindowEx
         switch (e.PropertyName)
         {
             case nameof(MainViewModel.IsCreating):
-                Ui.Shimmer(ViewModel.IsCreating); // light crosses the placeholder cards while the script is written
                 _skeletons = [];
                 break;
             case nameof(MainViewModel.Skeletons):
                 DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, Landed); // once the placeholders have been laid out
                 break;
             case nameof(MainViewModel.IsWorking) when ViewModel.IsWorking:
-                _shownPercent = 0;
                 ActivityPercentText.Text = "0%";
                 break;
             case nameof(MainViewModel.ActivityPercent):
-                _roll.Start();
+                ActivityPercentText.Text = $"{ViewModel.ActivityPercent:0}%";
                 ShowTaskbarProgress(ViewModel.ActivityPercent);
                 break;
-            case nameof(MainViewModel.Runtime):
-                _roll.Start();
+            case nameof(MainViewModel.Runtime): // told too when what has been spent changes
+                MetaText.Text = ViewModel.MetaText(ViewModel.Runtime.TotalSeconds, (double)ViewModel.Spent);
                 break;
             case nameof(MainViewModel.ErrorMessage) or nameof(MainViewModel.StatusMessage):
                 ShowMessage();
                 break;
         }
-    }
-
-    // The figures the app shows that change in steps (how far a job has got, the running time, what has been
-    // spent) count up to their new value over a few frames instead of jumping.
-    private void Roll()
-    {
-        var (percent, runtime, spent) = (ViewModel.ActivityPercent, ViewModel.Runtime.TotalSeconds, (double)ViewModel.Spent);
-        _shownPercent = Towards(_shownPercent, percent, 0.5);
-        _shownRuntime = Towards(_shownRuntime, runtime, 0.5);
-        _shownSpent = Towards(_shownSpent, spent, 0.004);
-        ActivityPercentText.Text = $"{_shownPercent:0}%";
-        MetaText.Text = ViewModel.MetaText(_shownRuntime, _shownSpent);
-        if (_shownPercent == percent && _shownRuntime == runtime && _shownSpent == spent) _roll.Stop();
-
-        static double Towards(double shown, double target, double near) =>
-            Math.Abs(target - shown) < near ? target : shown + (target - shown) * 0.25;
     }
 
     /// <summary>A long job has ended: clear the taskbar bar, and say so with a notification when the window is not in front.</summary>
@@ -196,7 +173,7 @@ public sealed partial class MainWindow : WindowEx
     private void Landed()
     {
         var now = ViewModel.Skeletons;
-        for (var i = 0; i < now.Count && Ui.Animated; i++)
+        for (var i = 0; i < now.Count; i++)
         {
             if (now[i].Length > 0 && (i >= _skeletons.Count || _skeletons[i].Length == 0) && Skeleton.ContainerFromIndex(i) is FrameworkElement { ActualWidth: > 0 } box)
                 Ui.PopIn(box);

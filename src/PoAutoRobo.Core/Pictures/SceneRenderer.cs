@@ -64,6 +64,7 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
             {
                 "--headless=new", "--disable-gpu", "--hide-scrollbars", "--mute-audio", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
                 $"--user-data-dir={profile}", "--remote-debugging-port=0", "--host-resolver-rules=MAP * ~NOTFOUND", "--proxy-server=127.0.0.1:9", "--proxy-bypass-list=<-loopback>",
+                "--force-webrtc-ip-handling-policy=disable_non_proxied_udp", // WebRTC's own traffic goes round a proxy, so it too meets the one that is not there
                 $"--window-size={Width},{Height}", "about:blank",
             })
                 start.ArgumentList.Add(arg);
@@ -76,27 +77,48 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
             var lastId = 0;
 
             // One request, then replies are read until the one that answers it; anything else is the browser's news.
+            // Each has a time limit of its own: a page whose code froze it between frames (a loop queued to run later)
+            // never answers, and the frame's own limit does not reach that far.
             async Task<JsonElement> Call(string method, object parameters)
             {
                 var id = ++lastId;
-                await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { id, method, @params = parameters }), WebSocketMessageType.Text, true, ct);
-                while (true)
+                using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                limit.CancelAfter(2 * FrameTimeout);
+                try
                 {
-                    using var message = new MemoryStream();
-                    ValueWebSocketReceiveResult part;
-                    do
+                    await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { id, method, @params = parameters }), WebSocketMessageType.Text, true, limit.Token);
+                    while (true)
                     {
-                        part = await socket.ReceiveAsync(buffer.AsMemory(), ct);
-                        message.Write(buffer, 0, part.Count);
+                        using var message = new MemoryStream();
+                        ValueWebSocketReceiveResult part;
+                        do
+                        {
+                            part = await socket.ReceiveAsync(buffer.AsMemory(), limit.Token);
+                            message.Write(buffer, 0, part.Count);
+                        }
+                        while (!part.EndOfMessage);
+                        using var json = JsonDocument.Parse(message.GetBuffer().AsMemory(0, (int)message.Length));
+                        if (!json.RootElement.TryGetProperty("id", out var answered) || answered.GetInt32() != id)
+                            continue;
+                        return json.RootElement.TryGetProperty("result", out var result)
+                            ? result.Clone()
+                            : throw new InvalidOperationException($"The browser could not draw the animation ({method}).");
                     }
-                    while (!part.EndOfMessage);
-                    using var json = JsonDocument.Parse(message.GetBuffer().AsMemory(0, (int)message.Length));
-                    if (!json.RootElement.TryGetProperty("id", out var answered) || answered.GetInt32() != id)
-                        continue;
-                    return json.RootElement.TryGetProperty("result", out var result)
-                        ? result.Clone()
-                        : throw new InvalidOperationException($"The browser could not draw the animation ({method}).");
                 }
+                catch (Exception e) when (e is OperationCanceledException or WebSocketException && limit.IsCancellationRequested && !ct.IsCancellationRequested)
+                {
+                    throw new SceneCodeException($"The page stopped answering for {2 * FrameTimeout / 1000} seconds; a loop in its code may never end.");
+                }
+            }
+
+            // The page's policy cannot stop it sending itself to another page, such as a file on this computer, which
+            // would then be pictured in the video. Each frame is checked to be the scene's own page after it is taken.
+            async Task StillTheScene()
+            {
+                var tree = await Call("Page.getFrameTree", new { });
+                if (!Uri.TryCreate(tree.GetProperty("frameTree").GetProperty("frame").GetProperty("url").GetString(), UriKind.Absolute, out var shown)
+                    || !shown.IsFile || !string.Equals(shown.LocalPath, page, StringComparison.OrdinalIgnoreCase))
+                    throw new SceneCodeException("The code tried to leave its page, which is not allowed.");
             }
 
             async Task<JsonElement> Run(string expression)
@@ -140,6 +162,7 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
             {
                 await Run(FormattableString.Invariant($"render({(double)frame / Fps:0.####}, {length.TotalSeconds:0.###})"));
                 var shot = await Call("Page.captureScreenshot", new { format = "jpeg", quality = 92 });
+                await StillTheScene();
                 await File.WriteAllBytesAsync(Path.Combine(work, $"f{frame:00000}.jpg"), shot.GetProperty("data").GetBytesFromBase64(), ct);
             }
 

@@ -163,9 +163,10 @@ public partial class MainViewModel
             // Every episode starts in the series look, with its own copy of the series music.
             var kit = SeriesKit.Load(AppPaths.Series);
             var music = SeriesKit.PathOf(AppPaths.Series, kit.Music) is { } track ? await ImportAsync(track, folder, "music-" + Path.GetFileName(track), ct) : null;
-            episode = EpisodeEditor.UseSeriesLook(episode, kit, music);
+            episode = EpisodeEditor.UseSeriesLook(episode, kit, music) with { Shots = [.. Shots.Select(s => s.ToShot())] };
             ProjectStore.Save(episode, folder);
             Footage.Clear(); // in the episode now; the next lesson starts with none
+            Shots.Clear();
             ProjectStore.SaveSnippets(grounding, folder);
             lock (_usedBeforeFolder)
             {
@@ -192,6 +193,7 @@ public partial class MainViewModel
         ReleasePreview();
         Preview = null;
         LastExport = null;
+        ThumbnailChoices.Clear();
         ShowTeasers(episode, []); // those were cut from the episode being left
         ForgetHistory();
         _notes.Clear();
@@ -201,6 +203,7 @@ public partial class MainViewModel
             Snippets.Add(snippet);
         OnPropertyChanged(nameof(SnippetsHeading));
         Episode = episode;
+        ShowMaster(EpisodeBuilder.LatestMaster(folder));
         Clips.Clear();
         foreach (var clip in episode.Clips)
             Clips.Add(NewCard(clip));

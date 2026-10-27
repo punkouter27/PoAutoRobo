@@ -80,6 +80,10 @@ public sealed class MockScriptWriter : IScriptWriter
     public Task<IReadOnlyList<Teaser>> SuggestTeasersAsync(Episode episode, IReadOnlyDictionary<Guid, TimeSpan> lengths, CancellationToken ct) =>
         Task.FromResult(Teasers.ByRule(episode, lengths));
 
+    public Task<IReadOnlyList<Shot>> SuggestShotsAsync(Lesson lesson, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Shot>>([.. BeatPlan.Beats(lesson.Structure).Where(b => b.ForFootage)
+            .SelectMany(b => new[] { new Shot(b.Name, "Wide: the whole robot and the place, as it starts"), new Shot(b.Name, "Close on its feet or hands as it moves") })]);
+
     public Task<PublishNotes> WritePublishNotesAsync(Episode episode, CancellationToken ct) =>
         Task.FromResult(new PublishNotes(
             [episode.Title],

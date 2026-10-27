@@ -95,6 +95,9 @@ public partial class App : Application
             };
             script.CanMake = visualsFor(AppPaths.Host, Quality.Medium).CanMake;
         }
+        // Uploading needs only the app's Google sign-in, not the Azure services. A whole video goes in one request, so no time limit.
+        var youTube = settings is { YouTubeClientId: { } id, YouTubeClientSecret: { } secret }
+            ? new YouTube(id, secret, new HttpClient { Timeout = Timeout.InfiniteTimeSpan }.SendAsync) : null;
         var paceGate = new Lock(); // recordings finish side by side
         viewModel.Connect(
             writer,
@@ -105,7 +108,8 @@ public partial class App : Application
             visualsFor,
             settings.ImageDeployment,
             settings.IsLive ? null : $"Script and voice simulated. {settings.LoadError ?? "The key vault has no address for your Azure AI resource."}",
-            hear);
+            hear,
+            youTube);
     }
 
     /// <summary>

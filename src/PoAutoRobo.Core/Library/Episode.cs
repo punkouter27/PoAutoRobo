@@ -103,6 +103,9 @@ public sealed record Episode(
     /// <summary>A music track played quietly under the narration, inside the episode folder; null for none.</summary>
     public string? MusicPath { get; init; }
 
+    /// <summary>The shots planned for filming the lesson, as ticked off; empty when none were asked for.</summary>
+    public IReadOnlyList<Shot> Shots { get; init; } = [];
+
     /// <summary>The first picture any clip has on disk, used as the episode's thumbnail; null when there is none.</summary>
     public string? Cover() => Clips.Select(clip => clip.Picture()).FirstOrDefault(path => path is not null);
 }

@@ -116,6 +116,32 @@ public partial class MainViewModel
         StatusMessage = $"Seen in “{row.Name}”: {seen.Timeline.ReplaceLineEndings(" ")}";
     });
 
+    // ---- The shots to film, planned before filming ----
+
+    /// <summary>The shots to film for the next episode, ticked off as they are filmed; saved with the episode once it is written.</summary>
+    public ObservableCollection<ShotRow> Shots { get; } = [];
+
+    private bool _planningShots; // its use is the next episode's, not that of the episode open now
+
+    /// <summary>Asks the fast model (or the one on this computer) for a few shots to film in each footage beat. One small request, only when asked.</summary>
+    [RelayCommand(CanExecute = nameof(CanCreateEpisode))]
+    private Task SuggestShotsAsync() => RunActivityAsync("Planning the shots to film", async ct =>
+    {
+        _planningShots = true;
+        try
+        {
+            var shots = await _scriptWriter.SuggestShotsAsync(new Lesson(TopicInput, WentWrongInput, NextStructure, []), ct);
+            Shots.Clear();
+            foreach (var shot in shots)
+                Shots.Add(new ShotRow(shot));
+            StatusMessage = shots.Count == 0 ? "No shots came back. Say a little more about the lesson and ask again." : $"{shots.Count} shots to film. Tick each one off as you film it.";
+        }
+        finally
+        {
+            _planningShots = false;
+        }
+    });
+
     /// <summary>Footage added before cards showed a frame of it has none saved; take one now so those cards are not blank.</summary>
     private async Task ShowFootageAsync()
     {
@@ -123,7 +149,7 @@ public partial class MainViewModel
         foreach (var card in Clips.Where(c => c.HasUserVideo && c.ThumbnailPath.Length == 0).ToList())
         {
             if (card.Clip.Visual.UserVideoPath is not { } video || !File.Exists(video)) continue;
-            await _builder.PosterAsync(video, CancellationToken.None);
+            await _builder.PosterAsync(video, _closing.Token);
             card.PictureChanged();
         }
     }
@@ -234,7 +260,7 @@ public partial class MainViewModel
             return Guard(async () =>
             {
                 Edit(e => EpisodeEditor.SetOwnSound(e, card.Id, true));
-                await _builder.NarrateClipAsync(card.Clip, folder, CancellationToken.None); // measured, so the running time is right
+                await _builder.NarrateClipAsync(card.Clip, folder, _closing.Token); // measured, so the running time is right
                 SyncCards();
             });
         return RunActivityAsync("Fitting the narration to your video", async ct =>

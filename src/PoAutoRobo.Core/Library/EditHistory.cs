@@ -2,11 +2,19 @@ namespace PoAutoRobo.Core.Library;
 
 /// <summary>Undo and redo over whole values: each edit remembers what was there before it.</summary>
 /// <param name="kept">How many steps back are remembered; older ones are dropped.</param>
-public sealed class EditHistory<T>(int kept = 50)
+/// <param name="clock">The time now; the system clock unless a test sets its own.</param>
+public sealed class EditHistory<T>(int kept = 50, Func<DateTimeOffset>? clock = null)
 {
+    /// <summary>
+    /// The longest pause inside one continuous change. A slider drag ticks many times a second; a caption change made
+    /// after a longer pause is a step of its own, not more of the last drag.
+    /// </summary>
+    private static readonly TimeSpan MergeGap = TimeSpan.FromSeconds(1);
+
+    private readonly Func<DateTimeOffset> _now = clock ?? (() => DateTimeOffset.UtcNow);
     private readonly List<T> _undo = [];
     private readonly List<T> _redo = [];
-    private bool _lastMerges;
+    private DateTimeOffset? _lastMerge;
 
     public bool CanUndo => _undo.Count > 0;
 
@@ -16,12 +24,13 @@ public sealed class EditHistory<T>(int kept = 50)
     /// <param name="merges">True for one tick of a continuous change, such as a slider drag: a run of them is undone as one.</param>
     public void Record(T before, bool merges = false)
     {
-        if (!(merges && _lastMerges))
+        var now = _now();
+        if (!(merges && now - _lastMerge <= MergeGap))
         {
             _undo.Add(before);
             if (_undo.Count > kept) _undo.RemoveAt(0);
         }
-        _lastMerges = merges;
+        _lastMerge = merges ? now : null;
         _redo.Clear();
     }
 
@@ -34,7 +43,7 @@ public sealed class EditHistory<T>(int kept = 50)
     {
         _undo.Clear();
         _redo.Clear();
-        _lastMerges = false;
+        _lastMerge = null;
     }
 
     private bool Travel(List<T> from, List<T> to, T current, out T target)
@@ -44,7 +53,7 @@ public sealed class EditHistory<T>(int kept = 50)
         target = from[^1];
         from.RemoveAt(from.Count - 1);
         to.Add(current);
-        _lastMerges = false;
+        _lastMerge = null;
         return true;
     }
 }

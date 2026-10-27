@@ -86,10 +86,11 @@ public static class EpisodeEditor
     public static async Task<Episode> EditDialogueAsync(Episode episode, Guid clipId, string dialogue, IScriptWriter writer, CancellationToken ct)
     {
         dialogue = dialogue.Trim();
-        if (dialogue.Length == 0)
-            throw new ArgumentException("Dialogue cannot be empty.", nameof(dialogue));
         var clip = episode.Clips.FirstOrDefault(c => c.Id == clipId)
             ?? throw new ArgumentException($"No clip {clipId} in this episode.", nameof(clipId));
+        // Over a film's own sound the words are only its captions, and a film may have none.
+        if (dialogue.Length == 0 && !clip.OwnSound)
+            throw new ArgumentException("Dialogue cannot be empty.", nameof(dialogue));
         var before = clip.Active.Dialogue;
         if (dialogue == before)
             return episode;
@@ -98,8 +99,18 @@ public static class EpisodeEditor
         // A line that keeps nearly all its words (a typo fixed, a phrase tightened) is the same subject; nobody is asked.
         var stale = clip.Visual.Stale
             || (HasGeneratedMedia(clip) && Durations.SharedWords(before, dialogue) < SameSubject && await writer.CoreChangedAsync(before, dialogue, ct));
-        return Update(episode, clipId, c => WithDialogue(c, dialogue) with { Visual = c.Visual with { Stale = stale } });
+        return SetDialogue(episode, clipId, dialogue, stale);
     }
+
+    /// <summary>
+    /// Gives the clip, as it is now, the words <see cref="EditDialogueAsync"/> settled on, and marks its picture out of
+    /// date when that said so. Everything else about the clip is left as it is, so a picture finished while the words
+    /// were being checked is kept. Nothing happens when the clip has gone.
+    /// </summary>
+    public static Episode SetDialogue(Episode episode, Guid clipId, string dialogue, bool stale) =>
+        episode.Clips.Any(c => c.Id == clipId)
+            ? Update(episode, clipId, c => WithDialogue(c, dialogue) with { Visual = c.Visual with { Stale = c.Visual.Stale || stale } })
+            : episode;
 
     /// <summary>Swaps the clip's picture for the user's footage and takes the dialogue and pace that were fitted to it.</summary>
     public static Episode AttachVideo(Episode episode, Guid clipId, string videoPath, FitResult fit) =>
@@ -109,8 +120,11 @@ public static class EpisodeEditor
             Visual = new VisualSpec(VisualKind.UserVideo, KindLocked: true, UserVideoPath: videoPath),
         });
 
-    public static Episode RemoveVideo(Episode episode, Guid clipId) =>
-        Update(episode, clipId, c => Narratable(c with { NarrationRate = 1.0, OwnSound = false, RobotView = false, Visual = new VisualSpec(VisualKind.TitleCard) }));
+    public static Episode RemoveVideo(Episode episode, Guid clipId) => Update(episode, clipId, WithoutVideo);
+
+    /// <summary>The clip as a title card narrated at normal pace: nothing of its film is left, its own sound and robot's view included.</summary>
+    internal static Clip WithoutVideo(Clip clip) =>
+        Narratable(clip with { NarrationRate = 1.0, OwnSound = false, RobotView = false, Visual = new VisualSpec(VisualKind.TitleCard) });
 
     /// <summary>
     /// A clip that is to be narrated needs words to say. One that played a film with its own sound may have none, so it

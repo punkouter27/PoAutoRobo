@@ -8,7 +8,7 @@ namespace PoAutoRobo.App.ViewModels;
 public sealed record IntroStart(string Name, string Accent, IntroLayout Layout)
 {
     /// <summary>The colour, for the small sketch of the look on its tile.</summary>
-    public Windows.UI.Color Colour => Windows.UI.Color.FromArgb(255, Convert.ToByte(Accent[1..3], 16), Convert.ToByte(Accent[3..5], 16), Convert.ToByte(Accent[5..7], 16));
+    public Windows.UI.Color Colour => Views.Colours.FromHex(Accent);
 }
 
 /// <summary>The series brand kit: what every episode shares, set up once on the Intro step.</summary>
@@ -48,6 +48,16 @@ public partial class MainViewModel
 
     /// <summary>The outro runs other than the standard fifteen seconds, so its length stays in view without advanced controls.</summary>
     public bool OutroTuned => _kit.OutroSeconds != new SeriesKit().OutroSeconds;
+
+    /// <summary>
+    /// The film finish over every clip, the intro and the outro. Off as standard; once on it stays in view without
+    /// advanced controls, so it can be turned off again.
+    /// </summary>
+    public bool SeriesGrain
+    {
+        get => _kit.Grain;
+        set => Store(_kit with { Grain = value });
+    }
 
     /// <summary>How every episode is told, as an index into <see cref="StructureChoices"/>.</summary>
     public int SeriesStructureIndex
@@ -122,6 +132,7 @@ public partial class MainViewModel
     {
         if (!FfmpegAvailable || Step != IntroStep) return;
         _still?.Cancel();
+        _still?.Dispose(); // the still it was drawing has seen the cancel; nothing waits on its token
         _still = new CancellationTokenSource();
         _ = DrawStillAsync(_still.Token);
     }
@@ -191,7 +202,7 @@ public partial class MainViewModel
     [
         nameof(SeriesChannel), nameof(SeriesTagline), nameof(SeriesOutro), nameof(SeriesLookIndex), nameof(SeriesAccent), nameof(SeriesLayoutIndex),
         nameof(SeriesLogoLabel), nameof(SeriesStingLabel), nameof(SeriesMusicLabel), nameof(SeriesMascotLabel), nameof(SeriesBrand),
-        nameof(OutroTuned), nameof(SeriesStructureIndex), nameof(StructureBeats), nameof(EpisodeOffSeriesLook),
+        nameof(OutroTuned), nameof(SeriesGrain), nameof(SeriesStructureIndex), nameof(StructureBeats), nameof(EpisodeOffSeriesLook),
     ];
 
     /// <summary>
@@ -278,23 +289,23 @@ public partial class MainViewModel
 
     /// <summary>Makes a short draft of the intro as it will look, with its sound. Built here: it costs nothing.</summary>
     [RelayCommand]
-    private Task PreviewIntroAsync(CancellationToken ct) => Guard(async () =>
+    private Task PreviewIntroAsync() => Guard(async () =>
     {
         if (!FfmpegAvailable)
             throw new InvalidOperationException("FFmpeg is needed to draw the intro. Install it, then restart the app.");
         var number = Episode?.Number is > 0 and var n ? n : Math.Max(1, (int)EpisodeNumber);
         _stillOfOutro = false;
-        IntroPreviewPath = await _builder.PreviewIntroAsync(SeriesBrand, number, ct);
+        IntroPreviewPath = await _builder.PreviewIntroAsync(SeriesBrand, number, _closing.Token);
     });
 
     /// <summary>Makes a draft of the outro as it will end every episode, at its full length. Built here: it costs nothing.</summary>
     [RelayCommand]
-    private Task PreviewOutroAsync(CancellationToken ct) => Guard(async () =>
+    private Task PreviewOutroAsync() => Guard(async () =>
     {
         if (!FfmpegAvailable)
             throw new InvalidOperationException("FFmpeg is needed to draw the outro. Install it, then restart the app.");
         _stillOfOutro = true;
-        OutroPreviewPath = await _builder.PreviewOutroAsync(SeriesBrand, ct);
+        OutroPreviewPath = await _builder.PreviewOutroAsync(SeriesBrand, _closing.Token);
     });
 
     /// <summary>The intro's sting or the outro's music as it will play, to listen to on the Intro step; null when it cannot be made. Free.</summary>
@@ -305,7 +316,7 @@ public partial class MainViewModel
         {
             if (!FfmpegAvailable)
                 throw new InvalidOperationException("FFmpeg is needed to play the music. Install it, then restart the app.");
-            path = await _builder.BookendSoundAsync(intro, SeriesBrand, CancellationToken.None);
+            path = await _builder.BookendSoundAsync(intro, SeriesBrand, _closing.Token);
         });
         return path;
     }

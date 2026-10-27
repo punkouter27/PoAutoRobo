@@ -33,12 +33,12 @@ public partial class ClipViewModel(Clip clip, Action<Func<Episode, Episode>> edi
 
     /// <summary>Figures and code names in the dialogue that are not in the episode's sources; empty when there are none.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Warnings), nameof(CheckWarning))]
+    [NotifyPropertyChangedFor(nameof(Warnings), nameof(CheckWarning), nameof(CheckTip))]
     public partial string Unverified { get; set; } = "";
 
     /// <summary>What an editor reading the whole script would change about this clip; empty when nothing.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Warnings), nameof(CheckWarning))]
+    [NotifyPropertyChangedFor(nameof(Warnings), nameof(CheckWarning), nameof(CheckTip))]
     public partial string Review { get; set; } = "";
 
     /// <summary>True while something is being made for this clip: a picture, a recording or a new depth.</summary>
@@ -82,12 +82,17 @@ public partial class ClipViewModel(Clip clip, Action<Func<Episode, Episode>> edi
     // Three kinds of thing worth a second look, each with its own mark on the card so they can be told apart at a
     // glance: the picture, the length, and the words themselves. Each is empty when there is nothing to say.
 
-    public string StaleWarning => IsStale ? "The picture is out of date." : "";
+    // Each says what is wrong and then what to do about it, as the card's mark shows it under the pointer.
+
+    public string StaleWarning => IsStale ? "The picture is out of date: the words or what it shows have changed since it was drawn. Generate it again on the Picture tab (Ctrl+G)." : "";
 
     // A film with its own sound runs as long as the film, whatever its words say.
-    public string LengthWarning => Clip.OwnSound ? "" : Durations.Warning(Clip) ?? "";
+    public string LengthWarning => Clip.OwnSound || Durations.Warning(Clip) is not { } warning ? "" : $"{warning}. Add or cut words on the Words tab so the clip runs 15 to 60 seconds.";
 
     public string CheckWarning => string.Join('\n', new[] { Unverified, Review.Length > 0 ? "Editor: " + Review : "" }.Where(line => line.Length > 0));
+
+    /// <summary>The words' problems as the card's mark says them: what is wrong, then what to do.</summary>
+    public string CheckTip => CheckWarning.Length == 0 ? "" : CheckWarning + "\nCheck the words on the Words tab before publishing; an editor's note can be answered there.";
 
     /// <summary>All three together, one to a line, for a screen reader; empty when there is nothing.</summary>
     public string Warnings => string.Join('\n', new[] { StaleWarning, LengthWarning, CheckWarning }.Where(line => line.Length > 0));

@@ -1,0 +1,66 @@
+<UserControl
+    x:Class="PoAutoRobo.App.Views.PublishPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PoAutoRobo.App.Views"
+    xmlns:app="using:PoAutoRobo.App"
+    xmlns:vm="using:PoAutoRobo.App.ViewModels">
+    <!-- Under the finished video: its chapters, a thumbnail to choose, and sending it to YouTube -->
+    <StackPanel Spacing="10">
+        <!-- Chapters -->
+        <Grid>
+            <TextBlock Text="Chapters" Style="{ThemeResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+            <Button HorizontalAlignment="Right" Content="Copy" Command="{x:Bind ViewModel.CopyChaptersCommand}" Visibility="{x:Bind app:Ui.ShowText(ViewModel.Chapters), Mode=OneWay}"
+                    ToolTipService.ToolTip="Copy the chapter list, to paste into a video's description by hand. It is already in the description of the upload below. Free." />
+        </Grid>
+        <TextBlock Text="{x:Bind ViewModel.ChaptersNote, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" />
+        <TextBlock Text="{x:Bind ViewModel.Chapters, Mode=OneWay}" IsTextSelectionEnabled="True" FontFamily="Consolas" Visibility="{x:Bind app:Ui.ShowText(ViewModel.Chapters), Mode=OneWay}" />
+
+        <!-- Thumbnail -->
+        <Grid Margin="0,8,0,0">
+            <TextBlock Text="Thumbnail" Style="{ThemeResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+            <Button HorizontalAlignment="Right" Content="Make thumbnails" Command="{x:Bind ViewModel.MakeThumbnailsCommand}"
+                    ToolTipService.ToolTip="Make three 1280 by 720 thumbnails from your films and the episode's pictures, with its title in the series' colour. Then click the one to use. Made on this computer: free." />
+        </Grid>
+        <TextBlock Text="{x:Bind ViewModel.ThumbnailNote, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" />
+        <GridView ItemsSource="{x:Bind ViewModel.ThumbnailChoices}" SelectionMode="Single" SelectionChanged="OnThumbnailPicked" AutomationProperties.Name="Thumbnails to choose from"
+                  ToolTipService.ToolTip="Click the thumbnail to use. It is saved in the episode's export folder and sent with the upload.">
+            <GridView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ThumbnailChoice">
+                    <Image Source="{x:Bind local:ClipCard.ToImage(Path)}" Width="160" Height="90" Stretch="UniformToFill" AutomationProperties.Name="Thumbnail" />
+                </DataTemplate>
+            </GridView.ItemTemplate>
+        </GridView>
+
+        <!-- YouTube -->
+        <TextBlock Text="YouTube" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,8,0,0" />
+        <TextBox Header="Title" Text="{x:Bind ViewModel.UploadTitle, Mode=TwoWay}" MaxLength="100"
+                 ToolTipService.ToolTip="The video's title on YouTube, up to 100 characters. Filled in from the titles written with the master video." />
+        <TextBox Header="Description" Text="{x:Bind ViewModel.UploadDescription, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ToolTipService.ToolTip="The video's description on YouTube, with the chapter list in it so the video shows chapters. Change it as you like." />
+        <TextBox Header="Tags" Text="{x:Bind ViewModel.UploadTags, Mode=TwoWay}" PlaceholderText="robots, unitree r1"
+                 ToolTipService.ToolTip="Search tags, separated by commas. YouTube keeps 500 characters of them; the rest are left off." />
+        <ComboBox Header="Who can watch" ItemsSource="{x:Bind ViewModel.PrivacyChoices}" SelectedIndex="{x:Bind ViewModel.PrivacyIndex, Mode=TwoWay}" MinWidth="160"
+                  ToolTipService.ToolTip="Private: only you. Unlisted: anyone with the link. Public: everyone. Private is safest; change it on YouTube once you have watched it there." />
+        <!-- One above the other: the column is too narrow for the two side by side in a small window -->
+        <StackPanel Spacing="{StaticResource GapSmall}" Visibility="{x:Bind ViewModel.Advanced, Mode=OneWay}">
+            <CalendarDatePicker Header="Goes public on (optional)" Date="{x:Bind ViewModel.ScheduleDate, Mode=TwoWay}" PlaceholderText="Not scheduled"
+                                ToolTipService.ToolTip="The day the video goes public by itself. It is uploaded private until then, whatever is chosen above. Leave it empty for no schedule." />
+            <TimePicker Header="At" SelectedTime="{x:Bind ViewModel.ScheduleTime, Mode=TwoWay}" MinWidth="0" HorizontalAlignment="Stretch"
+                        ToolTipService.ToolTip="The time of day, on this computer's clock, the scheduled video goes public." />
+        </StackPanel>
+        <!-- A disabled button shows no tooltip, so the reason sits on what holds it, and is said under it too. -->
+        <Border ToolTipService.ToolTip="{x:Bind ViewModel.UploadTip, Mode=OneWay}">
+            <Button HorizontalAlignment="Stretch" MinHeight="44" Content="Upload to YouTube" Command="{x:Bind ViewModel.UploadCommand}" />
+        </Border>
+        <Border ToolTipService.ToolTip="Send each rendered teaser to your channel as a YouTube Short, titled with its hook and #Shorts, as private, unlisted or public as chosen above. Free. TikTok is not offered: its posting API only works for apps TikTok has approved.">
+            <Button HorizontalAlignment="Stretch" MinHeight="44" Content="Upload teasers as Shorts" Command="{x:Bind ViewModel.UploadShortsCommand}" />
+        </Border>
+        <TextBlock Text="{x:Bind ViewModel.UploadTip, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" Visibility="{x:Bind app:Ui.Hide(ViewModel.YouTubeReady), Mode=OneWay}" />
+        <HyperlinkButton Padding="0" NavigateUri="{x:Bind ViewModel.VideoUri, Mode=OneWay}" Visibility="{x:Bind app:Ui.ShowText(ViewModel.VideoLink), Mode=OneWay}"
+                         ToolTipService.ToolTip="Open what was just uploaded on YouTube, in your browser.">
+            <TextBlock Text="{x:Bind ViewModel.VideoLink, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+        </HyperlinkButton>
+    </StackPanel>
+</UserControl>

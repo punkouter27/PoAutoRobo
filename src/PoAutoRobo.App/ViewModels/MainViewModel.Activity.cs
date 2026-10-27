@@ -22,7 +22,8 @@ public partial class MainViewModel
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(GeneratePictureCommand),
         nameof(NarrateAllCommand), nameof(CleanMediaCommand), nameof(CancelActivityCommand), nameof(CreateEpisodeCommand), nameof(AnotherTakeCommand), nameof(MakeDraftCommand),
-        nameof(WatchClipCommand), nameof(WatchTeaserCommand), nameof(SuggestNoteCommand), nameof(ApplyNoteCommand))]
+        nameof(WatchClipCommand), nameof(WatchTeaserCommand), nameof(SuggestNoteCommand), nameof(ApplyNoteCommand),
+        nameof(SuggestShotsCommand), nameof(MakeThumbnailsCommand), nameof(UploadCommand), nameof(UploadShortsCommand))]
     public partial bool IsWorking { get; set; }
 
     /// <summary>What the job is, e.g. "Rendering the master video (1080p, 30 fps)".</summary>

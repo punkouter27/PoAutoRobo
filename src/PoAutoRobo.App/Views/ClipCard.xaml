@@ -11,23 +11,23 @@
     <StackPanel Spacing="4" Padding="4" ToolTipService.ToolTip="{x:Bind Card.Heading, Mode=OneWay}">
         <Grid x:Name="PictureArea" Height="{StaticResource CardPictureHeight}" CornerRadius="4" Background="{ThemeResource ControlAltFillColorSecondaryBrush}">
             <Image Source="{x:Bind local:ClipCard.ToImage(Card.ThumbnailPath), Mode=OneWay}" Stretch="UniformToFill" AutomationProperties.Name="Clip picture" />
-            <!-- A mark for each kind of thing worth a second look, told apart by sign and colour; pointing at one says what -->
+            <!-- A badge for each kind of thing that needs attention, told apart by sign and colour; pointing at one says
+                 what is wrong and what to do. The header counts the cards that carry any. -->
             <StackPanel Orientation="Horizontal" Spacing="4" Margin="6" HorizontalAlignment="Left" VerticalAlignment="Top" AutomationProperties.Name="{x:Bind Card.Warnings, Mode=OneWay}">
                 <!-- The picture no longer matches the words: it wants making again -->
-                <Border Style="{StaticResource Mark}" Background="{ThemeResource SystemFillColorAttentionBackgroundBrush}"
-                        Visibility="{x:Bind app:Ui.ShowText(Card.StaleWarning), Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Card.StaleWarning, Mode=OneWay}">
-                    <FontIcon Glyph="&#xE72C;" FontSize="12" Foreground="{ThemeResource SystemFillColorAttentionBrush}" />
-                </Border>
-                <!-- The clip runs too short or too long -->
-                <Border Style="{StaticResource Mark}" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-                        Visibility="{x:Bind app:Ui.ShowText(Card.LengthWarning), Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Card.LengthWarning, Mode=OneWay}">
-                    <FontIcon Glyph="&#xE823;" FontSize="12" />
-                </Border>
+                <InfoBadge Style="{ThemeResource AttentionIconInfoBadgeStyle}" Visibility="{x:Bind app:Ui.ShowText(Card.StaleWarning), Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Card.StaleWarning, Mode=OneWay}">
+                    <InfoBadge.IconSource>
+                        <FontIconSource Glyph="&#xE72C;" />
+                    </InfoBadge.IconSource>
+                </InfoBadge>
+                <!-- The clip runs too short or too long for its slot -->
+                <InfoBadge Style="{ThemeResource InformationalIconInfoBadgeStyle}" Visibility="{x:Bind app:Ui.ShowText(Card.LengthWarning), Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Card.LengthWarning, Mode=OneWay}">
+                    <InfoBadge.IconSource>
+                        <FontIconSource Glyph="&#xE823;" />
+                    </InfoBadge.IconSource>
+                </InfoBadge>
                 <!-- The words themselves: a figure not found in the sources, or an editor's note -->
-                <Border Style="{StaticResource Mark}" Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
-                        Visibility="{x:Bind app:Ui.ShowText(Card.CheckWarning), Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Card.CheckWarning, Mode=OneWay}">
-                    <FontIcon Glyph="&#xE7BA;" FontSize="12" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
-                </Border>
+                <InfoBadge Style="{ThemeResource CautionIconInfoBadgeStyle}" Visibility="{x:Bind app:Ui.ShowText(Card.CheckWarning), Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Card.CheckTip, Mode=OneWay}" />
             </StackPanel>
             <!-- The clip's state in one strip: depth, picture type, length -->
             <Border Style="{StaticResource Badge}" HorizontalAlignment="Left" VerticalAlignment="Bottom"

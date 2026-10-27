@@ -3,7 +3,8 @@ namespace PoAutoRobo.Core.Render;
 /// <summary>
 /// The intro's opening: thousands of points of light spiral in on a current that never runs dry, are drawn harder and
 /// harder towards their places in the finished title card, and land all at once as the sting hits. The blow throws
-/// them outwards; each is held to its place by a spring and shivers back. Then they fade, leaving the real card.
+/// them outwards; each is held to its place by a spring and shivers back. Then they fade, leaving the real card. Each
+/// leaves a glowing trail as it flies, and they fly at different depths, so the swarm has room in it.
 /// </summary>
 /// <remarks>
 /// Drawn here, frame by frame, as plain colour values for FFmpeg to lay over the intro's background, because a drawing
@@ -13,7 +14,7 @@ namespace PoAutoRobo.Core.Render;
 public sealed class Swarm
 {
     /// <summary>The most points of light; a card with more lit pixels than this is sampled.</summary>
-    private const int MaxPoints = 24000;
+    private const int MaxPoints = 60000;
 
     private readonly int _width, _height;
     private readonly float _aspect;
@@ -25,6 +26,8 @@ public sealed class Swarm
     private readonly float[] _late;               // how long after the start each sets off for home, in seconds
     private readonly float[] _offX, _offY, _offVx, _offVy; // after the hit: thrown off its place and springing back
     private readonly float[] _light;              // red, green and blue for every pixel, added up as the points are drawn
+    private readonly float[] _trail;              // the light of the frames before, dying away behind each point as it moves
+    private readonly float[] _depth;              // how near each is before it lands: nearer ones swing wider and burn brighter
     private readonly float _glow;                 // how much light each point gives: landed together, they make the card as bright as it is
     private bool _struck;
 
@@ -35,6 +38,7 @@ public sealed class Swarm
         (_width, _height, _aspect) = (width, height, (float)width / height);
         _accent = (accent.R / 255f, accent.G / 255f, accent.B / 255f);
         _light = new float[width * height * 3];
+        _trail = new float[width * height * 3];
 
         // Every pixel bright enough to be part of something (a letter, the logo, the mascot) is a place to land.
         var lit = new List<int>();
@@ -51,7 +55,7 @@ public sealed class Swarm
         _glow = Math.Clamp(0.6f * lit.Count / Math.Max(1, n), 0.3f, 1.2f);
         (_homeX, _homeY, _red, _green, _blue) = (new float[n], new float[n], new float[n], new float[n], new float[n]);
         (_x, _y, _vx, _vy, _shownX, _shownY, _late) = (new float[n], new float[n], new float[n], new float[n], new float[n], new float[n], new float[n]);
-        (_offX, _offY, _offVx, _offVy) = (new float[n], new float[n], new float[n], new float[n]);
+        (_offX, _offY, _offVx, _offVy, _depth) = (new float[n], new float[n], new float[n], new float[n], new float[n]);
         for (var p = 0; p < n; p++)
         {
             var pixel = picked[p];
@@ -67,6 +71,7 @@ public sealed class Swarm
             (_vx[p], _vy[p]) = ((float)(-Math.Sin(angle) * speed), (float)(Math.Cos(angle) * speed));
             (_shownX[p], _shownY[p]) = (_x[p], _y[p]);
             _late[p] = (float)(random.NextDouble() * 0.6);
+            _depth[p] = (float)(0.55 + random.NextDouble() * 0.9);
         }
     }
 
@@ -101,7 +106,7 @@ public sealed class Swarm
         var split = 3f * MathF.Exp(-MathF.Abs(t - hit) * 10) * _height / 720f;
         for (var p = 0; p < Count; p++)
         {
-            float x, y, landed;
+            float x, y, landed, near = 1;
             if (!_struck)
             {
                 // Free flight: round the middle, a little inwards, and along a current that swirls but never gathers or drains.
@@ -118,6 +123,11 @@ public sealed class Swarm
                 landed = MathF.Pow(Math.Clamp((t - _late[p]) / (hit - _late[p]), 0, 1), 2.2f);
                 x = _x[p] + (_homeX[p] - _x[p]) * landed;
                 y = _y[p] + (_homeY[p] - _y[p]) * landed;
+
+                // Seen in depth: a near point swings wider round the middle and burns brighter, a far one keeps in and
+                // dims, and all come to the card's own plane as they land.
+                near = _depth[p] + (1 - _depth[p]) * landed;
+                (x, y) = (cx + (x - cx) * near, cy + (y - cy) * near);
             }
             else
             {
@@ -128,8 +138,9 @@ public sealed class Swarm
                 (x, y, landed) = (_homeX[p] + _offX[p], _homeY[p] + _offY[p], 1);
             }
 
-            // Each comes up out of the dark as it sets off, and burns brighter the nearer it is to home, so the card builds in light.
-            var light = _glow * Math.Clamp((t - _late[p] * 0.5f) / 0.6f, 0, 1) * (0.5f + 0.5f * landed) * gone;
+            // Each comes up out of the dark as it sets off, and burns brightest in flight, where its light is spread along a
+            // streak, so the swarm is seen as it gathers; landed, it gives just the card's own light.
+            var light = _glow * near * Math.Clamp((t - _late[p] * 0.5f) / 0.6f, 0, 1) * (3 - 2 * landed) * gone;
             var r = _accent.R + (_red[p] * 1.2f - _accent.R) * landed;
             var g = _accent.G + (_green[p] * 1.2f - _accent.G) * landed;
             var b = _accent.B + (_blue[p] * 1.2f - _accent.B) * landed;
@@ -140,8 +151,13 @@ public sealed class Swarm
         var flash = t >= hit ? 0.25f * MathF.Exp(-(t - hit) * 8) : 0;
         var ring = t >= hit ? (t - hit) * 1.6f : -1; // the blow's ring, spreading from the middle
         var ringLight = 0.3f * MathF.Exp(-(t - hit) * 4);
+        // How much of a trail is left after a frame, the same in time at any frame rate: long in flight, and gone in a
+        // moment once they have landed, so the shivering card does not smear.
+        var linger = MathF.Exp(-(_struck ? 30 : 8) * dt);
         for (var i = 0; i < _width * _height; i++)
         {
+            for (var c = 0; c < 3; c++)
+                _trail[i * 3 + c] = MathF.Max(_trail[i * 3 + c] * linger, _light[i * 3 + c]);
             var extra = flash;
             if (ring >= 0)
             {
@@ -151,7 +167,7 @@ public sealed class Swarm
             }
             for (var c = 0; c < 3; c++)
             {
-                var value = (_light[i * 3 + c] + extra) * 1.6f;
+                var value = (_trail[i * 3 + c] + extra) * 1.6f;
                 frame[i * 3 + c] = (byte)(value / (1 + value) * 255); // bright light rounds off instead of clipping
             }
         }

@@ -19,13 +19,22 @@ public partial class MainViewModel
             if (ReferenceEquals(updated, before)) return;
             // Dragging a caption slider is dozens of edits in a row; they are undone as one.
             var captionsOnly = updated with { Captions = before.Captions } == before;
-            _history.Record(before, merges: captionsOnly);
+            // Saved before it is remembered: a save that fails (the sync client holding the file) leaves the episode
+            // and its undo steps as they were, not an undo step that changes nothing.
             Apply(updated, captionsOnly);
+            _history.Record(before, merges: captionsOnly);
+            HistoryChanged();
         }
-        catch (Exception e) when (e is ArgumentException or IOException)
+        catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException)
         {
             ErrorMessage = e.Message;
         }
+    }
+
+    private void HistoryChanged()
+    {
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanUndo => _history.CanUndo;
@@ -35,24 +44,29 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private void Undo()
     {
-        if (Episode is { } now && _history.TryUndo(now, out var before)) Travel(before);
+        // A step that could not be saved is put back, so the history still matches the episode.
+        if (Episode is { } now && _history.TryUndo(now, out var before) && !Travel(before)) _history.TryRedo(before, out _);
+        HistoryChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanRedo))]
     private void Redo()
     {
-        if (Episode is { } now && _history.TryRedo(now, out var after)) Travel(after);
+        if (Episode is { } now && _history.TryRedo(now, out var after) && !Travel(after)) _history.TryUndo(after, out _);
+        HistoryChanged();
     }
 
-    private void Travel(Episode target)
+    private bool Travel(Episode target)
     {
         try
         {
             Apply(target);
+            return true;
         }
-        catch (IOException e)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             ErrorMessage = e.Message;
+            return false;
         }
     }
 
@@ -77,7 +91,7 @@ public partial class MainViewModel
         {
             ProjectStore.Save(episode, folder);
         }
-        catch (IOException e)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             ErrorMessage = e.Message;
         }
@@ -103,14 +117,12 @@ public partial class MainViewModel
         }
         else
         {
-            _saveRequest++; // this save carries any caption change that was still waiting
-            _unsaved = false;
             ProjectStore.Save(updated, EpisodeFolder!);
+            _saveRequest++; // this save carried any caption change that was still waiting
+            _unsaved = false;
             Episode = updated;
             SyncDeck(updated);
         }
-        UndoCommand.NotifyCanExecuteChanged();
-        RedoCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Brings the deck into line with the episode: cards are moved, added and removed to match its clips.</summary>
@@ -275,7 +287,7 @@ public partial class MainViewModel
     partial void OnSelectedClipChanging(ClipViewModel? oldValue, ClipViewModel? newValue)
     {
         if (!_syncingClips && oldValue is not null && Episode is not null && Episode.Clips.Any(c => c.Id == oldValue.Id))
-            _ = ApplyDialogueToAsync(oldValue, DraftDialogue, CancellationToken.None);
+            _ = ApplyDialogueToAsync(oldValue, DraftDialogue, _closing.Token);
     }
 
     [RelayCommand]
@@ -287,11 +299,13 @@ public partial class MainViewModel
         // Empty words are not applied, except as the captions of a film with its own sound; the box says so underneath.
         if (Episode is null || EpisodeFolder is not { } folder || (draft.Trim().Length == 0 && !clip.OwnSound) || draft.Trim() == clip.Dialogue) return;
         var updated = await EpisodeEditor.EditDialogueAsync(Episode, clip.Id, draft, _scriptWriter, ct);
-        // The drift check above can take a moment; apply only this clip so edits made meanwhile are kept.
+        // The drift check above can take a moment; only the words and whether the picture is out of date are taken,
+        // so edits made meanwhile, a picture finished meanwhile among them, are kept.
         var changed = updated.Clips.First(c => c.Id == clip.Id);
         _notes.Remove(clip.Id); // the editor's note was about the old words
-        Edit(e => EpisodeEditor.ReplaceClip(e, changed));
-        await _builder.NarrateClipAsync(changed, folder, ct); // new words are spoken straight away
+        Edit(e => EpisodeEditor.SetDialogue(e, clip.Id, changed.Active.Dialogue, changed.Visual.Stale));
+        if (Episode?.Clips.FirstOrDefault(c => c.Id == clip.Id) is { } now)
+            await _builder.NarrateClipAsync(now, folder, ct); // new words are spoken straight away
         SyncCards();
     });
 

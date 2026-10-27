@@ -19,3 +19,25 @@ yuv420p
 90000
 -y
 clip_00.mp4
+--- opening a beat, with the film finish ---
+-i
+panel.png
+-vf
+scale=3840:2160:force_original_aspect_ratio=increase,crop=3840:2160,zoompan=z='1+0.08*on/600':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=600:s=1920x1080:fps=30,split[clear][frost];[frost]trim=end=2.500,crop=130:110:54:54,gblur=sigma=16,drawbox=color=white@0.18:t=fill,format=yuva444p,geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='255*clip(min(min(X,W-1-X),min(Y,H-1-Y))/12,0,1)',fade=t=in:d=0.2:alpha=1,fade=t=out:st=2.200:d=0.3:alpha=1[pane];[clear][pane]overlay=54:54:eof_action=pass,ass=captions_00.ass,noise=alls=7:allf=t,vignette=PI/5,fade=t=in:st=0:d=0.250,fade=t=out:st=19.750:d=0.250[unlit];color=c=black:s=1152x134:r=30:d=0.500,format=rgba,geq=r='34+221*pow(X/W,8)':g='204+51*pow(X/W,8)':b='136+119*pow(X/W,8)':a='255*pow(X/W,3)*(1-pow(X/W,40))*exp(-pow(6*Y/H-3,2))'[streak];[unlit][streak]overlay=x='-w+(W+w)*t/0.500':y=H*0.42-h/2:eof_action=pass,format=yuv420p
+-t
+20.000
+-an
+-c:v
+libx264
+-preset
+veryfast
+-crf
+18
+-pix_fmt
+yuv420p
+-r
+30
+-video_track_timescale
+90000
+-y
+clip_00.mp4

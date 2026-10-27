@@ -8,16 +8,23 @@ public sealed class PublishTests
     [Fact]
     public void Chapters_and_subtitles_are_written_as_video_sites_read_them()
     {
-        Chapters_are_one_line_per_clip_with_its_start_as_minutes_and_seconds();
+        Chapters_are_a_line_to_each_beat_held_to_what_youtube_shows();
         Subtitles_are_numbered_plain_lines_timed_on_the_episode_clock_with_formatting_codes_removed();
     }
 
-    private void Chapters_are_one_line_per_clip_with_its_start_as_minutes_and_seconds()
+    private void Chapters_are_a_line_to_each_beat_held_to_what_youtube_shows()
     {
-        var chapters = PublishPack.Chapters([(S(0), "Meet the R1"), (S(75.4), "Why balance is hard"), (S(3725), "What to try next")]);
+        var chapters = PublishPack.Chapters([(S(0), "Meet the R1"), (S(75.4), "Why balance is hard"), (S(3725), "What to try next")], S(3800));
 
         // Video sites read this form, and need the first chapter at 0:00; past the hour the minutes keep counting.
         Assert.Equal("0:00 Meet the R1\n1:15 Why balance is hard\n62:05 What to try next\n", chapters);
+
+        // A chapter to each beat, clips in the same beat running on as one. YouTube shows none under ten seconds: a short
+        // intro hands 0:00 to the beat after it, and a short beat or outro joins the chapter before it.
+        (TimeSpan, string)[] timeline = [(S(0), "Intro"), (S(5), "Goal"), (S(15), "Goal"), (S(25), "Try"), (S(29), "Fail"), (S(60), "Result"), (S(90), "Outro")];
+        Assert.Equal("0:00 Goal\n0:29 Fail\n1:00 Result\n", PublishPack.Chapters(timeline, S(96)));
+        // Fewer than three chapters left, and YouTube shows none, so there is no list at all.
+        Assert.Equal("", PublishPack.Chapters(timeline[..4], S(40)));
 
         // The upload details are laid out to copy from, a part at a time.
         var notes = PublishPack.Description(new PublishNotes(["One", "Two"], "About it.", ["robots", "balance"], ["#r1"]));
@@ -45,6 +52,70 @@ public sealed class PublishTests
             "2\n00:00:00,800 --> 00:00:01,000\nNext.\n\n" +
             "3\n01:01:01,500 --> 01:01:02,000\nBye.\n\n",
             srt);
+    }
+
+    // ---- Uploading ----
+
+    [Fact]
+    public async Task An_upload_signs_in_in_the_browser_then_sends_its_details_held_to_youtubes_limits_and_then_the_film()
+    {
+        var video = Path.GetTempFileName();
+        await File.WriteAllBytesAsync(video, new byte[3000]);
+        var sent = new List<(HttpRequestMessage Request, string Body)>();
+        async Task<HttpResponseMessage> Send(HttpRequestMessage request, CancellationToken ct)
+        {
+            sent.Add((request, request.Content is null ? "" : await request.Content.ReadAsStringAsync(ct))); // reading the film sends it
+            var reply = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(sent.Count switch { 1 => """{ "access_token": "pass" }""", 2 => "", _ => """{ "id": "abc123" }""" }),
+            };
+            if (sent.Count == 2) reply.Headers.Location = new Uri("https://upload.example/session");
+            return reply;
+        }
+        // The browser: Google's page sends it back to this computer with a code, and the app's own page says it is done.
+        Uri? asked = null;
+        Task<string>? browser = null;
+        using var http = new HttpClient();
+        var youTube = new YouTube("client", "secret", Send)
+        {
+            OpenBrowser = uri =>
+            {
+                asked = uri;
+                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                browser = http.GetStringAsync($"{query["redirect_uri"]}?code=the-code&state={query["state"]}");
+                return Task.CompletedTask;
+            },
+        };
+        var progress = new List<double>();
+
+        var token = await youTube.SignInAsync(default);
+        var at = new DateTimeOffset(2026, 11, 2, 17, 0, 0, TimeSpan.FromHours(1));
+        var id = await youTube.UploadAsync(token, video, new UploadDetails(new string('a', 120) + "<b>", "Chapters\n0:00 Goal", ["robots", new string('t', 480), "one tag too many"], Privacy.Public, at),
+            new Relay<double>(progress.Add), default);
+        File.Delete(video);
+
+        Assert.Contains("Signed in", await browser!);
+        Assert.Equal(("pass", "abc123"), (token, id));
+        // Signed in with a proof made fresh for the purpose (PKCE), asking only to upload, and for no lasting pass.
+        var auth = System.Web.HttpUtility.ParseQueryString(asked!.Query);
+        Assert.Equal(("S256", "https://www.googleapis.com/auth/youtube.upload", null), (auth["code_challenge_method"], auth["scope"], auth["access_type"]));
+        var exchange = System.Web.HttpUtility.ParseQueryString(sent[0].Body);
+        Assert.Equal(("the-code", "authorization_code"), (exchange["code"], exchange["grant_type"]));
+        var proof = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(exchange["code_verifier"]!))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        Assert.Equal(auth["code_challenge"], proof);
+        // The upload opens with its details, held to YouTube's limits; a scheduled video goes up private until its time.
+        var start = sent[1].Request;
+        Assert.Equal("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", start.RequestUri!.AbsoluteUri);
+        Assert.Equal(("Bearer pass", "3000", "video/mp4"), (start.Headers.Authorization!.ToString(), start.Headers.GetValues("X-Upload-Content-Length").Single(), start.Headers.GetValues("X-Upload-Content-Type").Single()));
+        var details = System.Text.Json.Nodes.JsonNode.Parse(sent[1].Body)!;
+        Assert.Equal(new string('a', 100), details["snippet"]!["title"]!.GetValue<string>());
+        Assert.Equal("Chapters\n0:00 Goal", details["snippet"]!["description"]!.GetValue<string>());
+        Assert.Equal(["robots", new string('t', 480)], details["snippet"]!["tags"]!.AsArray().Select(t => t!.GetValue<string>()));
+        Assert.Equal(("private", "2026-11-02T16:00:00Z"), (details["status"]!["privacyStatus"]!.GetValue<string>(), details["status"]!["publishAt"]!.GetValue<string>()));
+        // Then the film itself, to where YouTube said, with how far it has got.
+        var put = sent[2].Request;
+        Assert.Equal((HttpMethod.Put, "https://upload.example/session", 3000L), (put.Method, put.RequestUri!.AbsoluteUri, sent[2].Body.Length));
+        Assert.Equal(1.0, progress[^1]);
     }
 
     // ---- Teasers ----

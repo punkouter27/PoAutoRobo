@@ -36,7 +36,7 @@ public partial class MainViewModel
 
     public Color CaptionAccent
     {
-        get => Color.FromArgb(255, Convert.ToByte(Captions.AccentColor[1..3], 16), Convert.ToByte(Captions.AccentColor[3..5], 16), Convert.ToByte(Captions.AccentColor[5..7], 16));
+        get => Views.Colours.FromHex(Captions.AccentColor);
         set { if (value != CaptionAccent) SetCaptions(Captions with { AccentColor = $"#{value.R:X2}{value.G:X2}{value.B:X2}" }); }
     }
 
@@ -130,12 +130,14 @@ public partial class MainViewModel
             ReportActivity("Writing the title, description and tags to upload with it", 1);
             var notes = (await _scriptWriter.WritePublishNotesAsync(episode, ct)).InSeries(_kit.ChannelName, episode.Number);
             await File.WriteAllTextAsync(Path.ChangeExtension(video, ".description.txt"), PublishPack.Description(notes), ct);
+            JsonFile.Save(Path.ChangeExtension(video, NotesExtension), notes); // what the upload form on this step starts from
             withNotes = ", subtitles, thumbnail and upload description";
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             ErrorMessage = "The video is finished, but its upload description could not be written. " + Plain(e);
         }
+        ShowMaster(video);
         var bookends = _kit.ChannelName.Trim().Length > 0 ? "" : " It has no intro or outro: give the channel a name on the Intro step to add them.";
         StatusMessage = $"Saved {Path.GetFileName(video)}, with its chapter list{withNotes} beside it.{bookends}";
     }
@@ -215,7 +217,7 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanRender))]
     private async Task WatchClipAsync(ClipViewModel? card)
     {
-        if (card is null) await ApplyDialogueAsync(CancellationToken.None); // Ctrl+P leaves the words' box with focus, so they are not applied yet
+        if (card is null) await ApplyDialogueAsync(_closing.Token); // Ctrl+P leaves the words' box with focus, so they are not applied yet
         if ((card ?? SelectedClip) is not { } clip || Episode is not { } episode) return;
         var index = episode.Clips.ToList().FindIndex(c => c.Id == clip.Id);
         if (index < 0) return; // taken out of the episode meanwhile
@@ -272,11 +274,18 @@ public partial class MainViewModel
         }
     }
 
-    /// <summary>Stops a clip or teaser being got ready to watch, and a still of the intro being drawn. The window calls this as it closes.</summary>
+    /// <summary>
+    /// Cancelled as the window closes. The small jobs that start FFmpeg outside a long job (a frame of a film, a clip's
+    /// sound, a draft of the intro) run on it, so none is left running with nobody to hand its result to.
+    /// </summary>
+    private readonly CancellationTokenSource _closing = new();
+
+    /// <summary>Stops a clip or teaser being got ready to watch, a still of the intro being drawn, and every small job on <see cref="_closing"/>. The window calls this as it closes.</summary>
     public void StopWatching()
     {
         _watching?.Cancel();
         _still?.Cancel();
+        _closing.Cancel();
     }
 
     // Progress<T> hops back to the UI thread, so it must be made on it.

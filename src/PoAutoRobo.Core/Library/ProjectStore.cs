@@ -70,11 +70,13 @@ public static class ProjectStore
     }
 
     // Media must live inside the episode's own folder. A path pointing anywhere else (a network share, a system
-    // file) is dropped, so opening an episode can never make the app reach out to or read from another place.
+    // file) is dropped, so opening an episode can never make the app reach out to or read from another place. The app
+    // writes every path in full; one that is not (relative, or "C:x.png" on a drive's current folder) would be read
+    // from wherever the app happens to be running, so it is dropped too.
     private static Episode KeepOwnMedia(Episode episode, string folder)
     {
         var root = Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        bool Inside(string path) => Path.GetFullPath(path, root).StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        bool Inside(string path) => Path.IsPathFullyQualified(path) && Path.GetFullPath(path).StartsWith(root, StringComparison.OrdinalIgnoreCase);
 
         return episode with
         {
@@ -83,7 +85,7 @@ public static class ProjectStore
             {
                 var visual = clip.Visual;
                 if (visual.UserVideoPath is { } video && !Inside(video))
-                    return clip with { NarrationRate = 1.0, Visual = new VisualSpec(VisualKind.TitleCard) };
+                    return EpisodeEditor.WithoutVideo(clip);
                 if (visual.EarlierTakes is { } takes && !takes.All(take => take.All(Inside)))
                     visual = visual with { EarlierTakes = [.. takes.Where(take => take.All(Inside))] };
                 if (visual.MediaPaths is { } media && !media.All(Inside))
@@ -159,7 +161,7 @@ public static class ProjectStore
         [.. JsonFile.Load<List<GroundingSnippet>>(Path.Combine(folder, SnippetsFile), [], JsonOptions)
             .Where(s => s is { Repo: not null, Path: not null, Text: not null } && Files.IsWebLink(s.Url ?? ""))];
 
-    /// <summary>Copies an episode to a new folder beside it, without its finished videos, and returns that folder.</summary>
+    /// <summary>Copies an episode to a new folder beside it, without its finished videos or its spending, and returns that folder.</summary>
     public static string Duplicate(string folder, string root)
     {
         var episode = Load(folder);
@@ -168,7 +170,9 @@ public static class ProjectStore
         foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(folder, file);
-            if (relative.StartsWith("export" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            // The spending stays with the original: copied, the month's total would count it twice.
+            if (relative.StartsWith("export" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                || relative.Equals(SpendLog.FileName, StringComparison.OrdinalIgnoreCase))
                 continue;
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(copy, relative))!);
             File.Copy(file, Path.Combine(copy, relative));

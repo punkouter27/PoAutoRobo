@@ -6,19 +6,21 @@ namespace PoAutoRobo.App.Views;
 
 /// <summary>
 /// The choices the app remembers between runs: picture quality, the monthly budget and what has been spent, the
-/// advanced controls, and the optional services.
+/// advanced controls, and the optional services. Shown in the panel at the window's right; made afresh each time it opens.
 /// </summary>
-public sealed partial class SettingsDialog : ContentDialog
+public sealed partial class SettingsPanel : UserControl
 {
-    public SettingsDialog(MainViewModel viewModel)
+    private readonly Action _close; // puts the panel away
+
+    public SettingsPanel(MainViewModel viewModel, Action close)
     {
         ViewModel = viewModel;
+        _close = close;
         viewModel.RefreshSpendDetail();
         InitializeComponent();
         // The model names are advanced controls, and the switch for those is on this page too.
         Services.Advanced = viewModel.Advanced;
         viewModel.PropertyChanged += OnViewModelChanged;
-        Closed += (_, _) => viewModel.PropertyChanged -= OnViewModelChanged;
         LiveText.Text = !viewModel.IsConnected ? "Still connecting."
             : viewModel.OfflineMessage is null ? "Script, voice and pictures are live."
             : "Script, voice and pictures are on stand-ins, as there is no connection to Azure.";
@@ -38,9 +40,13 @@ public sealed partial class SettingsDialog : ContentDialog
         if (e.PropertyName == nameof(MainViewModel.Advanced)) Services.Advanced = ViewModel.Advanced;
     }
 
+    private void OnUnloaded(object sender, RoutedEventArgs e) => ViewModel.PropertyChanged -= OnViewModelChanged;
+
+    private void OnClose(object sender, RoutedEventArgs e) => _close();
+
     private void OnRestart(object sender, RoutedEventArgs e)
     {
-        Hide();
+        _close();
         App.Restart();
     }
 }

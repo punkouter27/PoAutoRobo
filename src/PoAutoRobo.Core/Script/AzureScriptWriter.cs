@@ -37,6 +37,8 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
     private sealed record OutlineDto(string Title, List<PlannedClipDto> Clips);
     private sealed record SearchDto(List<string> Terms);
     private sealed record HostDto(bool Same, string Difference);
+    private sealed record ShotDto(string Beat, string Shot);
+    private sealed record ShotsDto(List<ShotDto> Shots);
 
     /// <summary>How many clips are written at once. More than this and the service starts turning requests away as too many.</summary>
     private const int ClipsAtOnce = 4;
@@ -286,10 +288,15 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
 
     /// <summary>
     /// Text from a repository, a model or a paste goes inside a tag the system prompts tell the model not to obey.
-    /// Any copy of the closing tag, however it is spaced or cased, is removed first, so the text cannot end its own fence early.
+    /// Any copy of the closing tag, however it is spaced or cased, is removed first, so the text cannot end its own fence
+    /// early. Removed until none is left: taking one out of "&lt;&lt;/x&gt;/x&gt;" would otherwise join the rest into another.
     /// </summary>
-    public static string Fenced(string tag, string attributes, string text) =>
-        $"<{tag}{attributes}>\n{Regex.Replace(text, $@"<\s*/\s*{tag}\s*>", "", RegexOptions.IgnoreCase)}\n</{tag}>\n";
+    public static string Fenced(string tag, string attributes, string text)
+    {
+        for (var was = ""; was != text;)
+            (was, text) = (text, Regex.Replace(text, $@"<\s*/\s*{tag}\s*>", "", RegexOptions.IgnoreCase));
+        return $"<{tag}{attributes}>\n{text}\n</{tag}>\n";
+    }
 
     // A repository path or link sits inside quotes on the opening tag; it must not be able to close them.
     private static string Attribute(string value) => value.Replace("\"", "&quot;").Replace("<", "&lt;").Replace(">", "&gt;");

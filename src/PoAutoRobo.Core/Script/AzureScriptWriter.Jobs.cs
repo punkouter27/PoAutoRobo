@@ -96,6 +96,19 @@ public sealed partial class AzureScriptWriter
         AskLight<PublishNotes>(ScriptSchemas.PublishSystem,
             Fenced("existing", "", string.Join("\n\n", episode.Clips.Select(c => $"{c.Title}\n{c.Active.Dialogue}"))), "publish", ScriptSchemas.Publish, ct);
 
+    /// <summary>The most shots kept for one beat, so the list stays one to film from.</summary>
+    private const int MaxShotsPerBeat = 4;
+
+    public async Task<IReadOnlyList<Shot>> SuggestShotsAsync(Lesson lesson, CancellationToken ct)
+    {
+        var beats = BeatPlan.Beats(lesson.Structure).Where(b => b.ForFootage).Select(b => b.Name).ToList();
+        var reply = await AskLight<ShotsDto>(ScriptSchemas.ShotsSystem,
+            $"Beats to film, in order: {string.Join(", ", beats)}.\n" + Fenced("topic", "", Capped(lesson.Topic)), "shots", ScriptSchemas.Shots, ct);
+        // Only the beats asked about, in their order, and a few to each.
+        return [.. beats.SelectMany(beat => reply.Shots.Where(s => s is not null && s.Beat == beat && !string.IsNullOrWhiteSpace(s.Shot))
+            .Take(MaxShotsPerBeat).Select(s => new Shot(beat, s.Shot.Trim())))];
+    }
+
     /// <summary>The most terms a lesson is searched by, besides its own words, so a chatty reply cannot fan out into dozens of searches.</summary>
     private const int MaxSearchTerms = 8;
 

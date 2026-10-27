@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace PoAutoRobo.App;
 
-// The questions the view model asks the user, and Settings, opened from the header.
+// The questions the view model asks the user, and Settings, opened from the header into the side panel.
 public sealed partial class MainWindow
 {
     private async Task<bool> ConfirmAsync(string title, string message, string action)
@@ -49,12 +49,20 @@ public sealed partial class MainWindow
         return await dialog.ShowAsync() == ContentDialogResult.Primary && box.Text.Trim() is { Length: > 0 } text ? text : null;
     }
 
-    private async void OnSettings(object sender, RoutedEventArgs e) => await ShowAsync(new Views.SettingsDialog(ViewModel));
-
-    private async Task ShowAsync(ContentDialog dialog)
+    // Settings is long and asks nothing that must be answered, so it opens in the panel at the right, beside the page,
+    // not as a dialog over it. A question about money or publishing stays a dialog: it must be answered before going on.
+    private void OnSettings(object sender, RoutedEventArgs e)
     {
-        dialog.XamlRoot = Content.XamlRoot;
-        dialog.Opened += (opened, _) => Ui.PopIn(opened.Content as UIElement ?? opened);
-        await dialog.ShowAsync();
+        SidePanel.Pane = new Views.SettingsPanel(ViewModel, () => SidePanel.IsPaneOpen = false);
+        SidePanel.Visibility = Visibility.Visible;
+        SidePanel.IsPaneOpen = true;
+    }
+
+    // Emptied once put away, so the panel stops listening and opens fresh, with the spending worked out again; and
+    // hidden, so nothing of it can stand between the pointer and the page.
+    private void OnSidePanelClosed(SplitView sender, object args)
+    {
+        SidePanel.Pane = null;
+        SidePanel.Visibility = Visibility.Collapsed;
     }
 }

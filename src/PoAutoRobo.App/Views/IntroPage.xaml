@@ -156,14 +156,15 @@
                     <TextBlock Text="{x:Bind ViewModel.HostCandidatesCost, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" Margin="0,-6,0,0" />
                     <ProgressBar IsIndeterminate="True" Visibility="{x:Bind ViewModel.MakeHostCandidatesCommand.IsRunning, Mode=OneWay}" />
                     <ItemsControl x:Name="HostList" ItemsSource="{x:Bind ViewModel.HostCandidates}" IsTabStop="False" AutomationProperties.Name="Host designs">
+                        <!-- Three to a row where they fit, wrapping in the narrower column of a small window -->
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}" />
+                                <ItemsWrapGrid Orientation="Horizontal" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="x:String">
-                                <Button Tag="{x:Bind}" Click="OnUseHost" Padding="4" AutomationProperties.Name="A host design"
+                                <Button Tag="{x:Bind}" Click="OnUseHost" Padding="4" Margin="0,0,8,8" AutomationProperties.Name="A host design"
                                         ToolTipService.ToolTip="Keep this design as the host, so every new picture shows the same character. Pictures already made are not changed.">
                                     <Image Width="96" Height="64" Stretch="UniformToFill" Source="{x:Bind local:ClipCard.ToImage((x:String))}" />
                                 </Button>
@@ -214,6 +215,11 @@
                                ToolTipService.ToolTip="How long the outro at the end of every episode runs, 5 to 20 seconds; 15 unless changed. YouTube's end-screen cards (subscribe, next video) can be placed over it when you upload. Type a number or use the arrows." />
                 </StackPanel>
 
+                <!-- Advanced: off as standard. Shown anyway while it is on, so it can be turned off again. -->
+                <CheckBox x:Name="GrainBox" Content="Film grain and vignette" IsChecked="{x:Bind ViewModel.SeriesGrain, Mode=TwoWay}"
+                          Visibility="{x:Bind app:Ui.ShowEither(ViewModel.Advanced, ViewModel.SeriesGrain), Mode=OneWay}"
+                          ToolTipService.ToolTip="Gives every clip, the intro and the outro a film look: fine grain that moves and slightly darker corners. Use it for a warmer, less digital feel. Clips are drawn again at the next render; it costs nothing." />
+
                 <TextBlock Text="New episodes" Style="{StaticResource SectionHeading}" />
                 <StackPanel Spacing="4">
                     <TextBlock Text="Told as" />
@@ -259,7 +265,7 @@
                 <ProgressBar IsIndeterminate="True" Visibility="{x:Bind ViewModel.PreviewOutroCommand.IsRunning, Mode=OneWay}" />
                 <Grid ColumnSpacing="{StaticResource GapSmall}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Button x:Name="PreviewIntroButton" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.PreviewIntroCommand}"

@@ -4,16 +4,6 @@ using NSubstitute;
 
 namespace PoAutoRobo.Core.Tests;
 
-/// <summary>Runs only where FFmpeg is installed; skipped elsewhere.</summary>
-public sealed class FfmpegFactAttribute : FactAttribute
-{
-    public FfmpegFactAttribute()
-    {
-        if (FfmpegRunner.Locate() is null)
-            Skip = "FFmpeg is not installed.";
-    }
-}
-
 [Trait("Category", "Integration")] // these run FFmpeg for real
 public sealed class EndToEndTests : IDisposable
 {
@@ -95,34 +85,30 @@ public sealed class EndToEndTests : IDisposable
         Assert.Equal(1.0, progress[^1].Fraction, precision: 2);
         Assert.Empty(Directory.GetDirectories(Path.Combine(_folder, "export"))); // working folder cleaned up
 
-        // Beside the video, ready to upload with it: a chapter per clip, subtitles and a cover picture.
+        // Beside the video, ready to upload with it: subtitles and a cover picture. Three clips of a few seconds make no
+        // three chapters of ten seconds, so there is no chapter list YouTube would show.
         var name = Path.ChangeExtension(output, null);
-        Assert.Equal(episode.Clips.Select(c => c.Title), File.ReadAllLines(name + ".chapters.txt").Select(line => line[(line.IndexOf(' ') + 1)..]));
-        Assert.StartsWith("0:00 ", File.ReadAllText(name + ".chapters.txt"));
+        Assert.False(File.Exists(name + ".chapters.txt"));
         Assert.StartsWith("1\n00:00:00,000 --> ", File.ReadAllText(name + ".srt"));
         Assert.True(File.Exists(name + ".thumbnail.png"));
     }
 
     [FfmpegFact]
-    public async Task The_series_intro_and_outro_open_and_close_the_export_and_the_chapters_still_start_at_nought()
+    public async Task The_series_intro_and_outro_open_and_close_the_export()
     {
         var three = await ThreeClipEpisodeAsync();
-        // The film seen through the robot's eyes, and each clip a beat of its own, so a whoosh carries each one in.
+        // The film seen through the robot's eyes, and each clip a beat of its own, so a whoosh and a streak of light carry
+        // each one in under a strap on frosted glass; the film finish is on, so every filter the polish adds really runs.
         var episode = three with { Number = 7, Clips = [.. three.Clips.Select((c, i) => c with { Beat = $"Beat {i}", RobotView = c.Visual.UserVideoPath is not null })] };
         var kitFolder = Directory.CreateDirectory(Path.Combine(_folder, "series")).FullName;
-        var brand = new Brand(new SeriesKit { ChannelName = "Teaching the R1", OutroSeconds = 6 }, kitFolder);
+        var brand = new Brand(new SeriesKit { ChannelName = "Teaching the R1", OutroSeconds = 6, Grain = true }, kitFolder);
 
         var output = await Builder.ExportAsync(episode, _folder, Small, new CaptionStyle(), brand, null, default);
-
         Assert.StartsWith("07-", Path.GetFileName(output)); // sorts with the series
         var narration = await Builder.NarrateAsync(episode, _folder, default);
         var slots = FfmpegArgs.Timeline([EpisodeBuilder.IntroLength, .. narration.Select(n => n.Duration), TimeSpan.FromSeconds(6)]);
         var expected = slots[^1].Start + slots[^1].VideoLength;
         Assert.InRange(await Ffmpeg.ProbeDurationAsync(output, default), expected - TimeSpan.FromSeconds(0.2), expected + TimeSpan.FromSeconds(0.2));
-        // YouTube shows chapters only when the first is at 0:00 and none is under ten seconds, so the intro joins the first clip's.
-        var chapters = File.ReadAllLines(Path.ChangeExtension(output, null) + ".chapters.txt");
-        Assert.Equal($"0:00 {episode.Clips[0].Title}", chapters[0]);
-        Assert.Equal(episode.Clips.Count, chapters.Length);
         // The captions are where the clips are: after the intro.
         Assert.StartsWith($"1\n00:00:0{(int)slots[1].Start.TotalSeconds},", File.ReadAllText(Path.ChangeExtension(output, null) + ".srt"));
 
@@ -137,6 +123,25 @@ public sealed class EndToEndTests : IDisposable
         var plain = await Builder.ExportAsync(episode, _folder, Small, new CaptionStyle(), brand with { Kit = new SeriesKit() }, null, default);
         var bare = FfmpegArgs.Timeline([.. narration.Select(n => n.Duration)])[^1];
         Assert.InRange(await Ffmpeg.ProbeDurationAsync(plain, default), bare.Start + bare.VideoLength - TimeSpan.FromSeconds(0.2), bare.Start + bare.VideoLength + TimeSpan.FromSeconds(0.2));
+    }
+
+    [FfmpegFact]
+    public async Task Thumbnails_are_drawn_at_youtubes_size_from_the_owners_film_and_the_episodes_pictures_with_its_title()
+    {
+        var episode = await ThreeClipEpisodeAsync() with { Number = 7, Title = "Teaching the R1 to climb three stairs without the handrail" };
+
+        var made = await Builder.ThumbnailsAsync(episode, new Brand(new SeriesKit { ChannelName = "Teaching the R1" }, _folder), default);
+
+        Assert.Equal(2, made.Count); // the film and the picture; a title card has nothing to show
+        Assert.All(made, file => Assert.StartsWith(Files.ScratchRoot, file)); // working files, until one is chosen
+        foreach (var file in made)
+        {
+            var probe = await Ffmpeg.ProbeAsync(["-v", "error", "-show_entries", "stream=codec_name,width,height", "-of", "default=nw=1", file], default);
+            Assert.Contains("codec_name=mjpeg", probe);
+            Assert.Contains("width=1280", probe);
+            Assert.Contains("height=720", probe);
+            Assert.InRange(new FileInfo(file).Length, 1, 2 * 1024 * 1024); // YouTube takes a thumbnail of up to 2 MB
+        }
     }
 
     [FfmpegFact]

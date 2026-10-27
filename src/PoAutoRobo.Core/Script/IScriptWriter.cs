@@ -69,6 +69,9 @@ public interface IScriptWriter
     /// <summary>The words a lesson's passages would be found by in the official repositories, besides its own.</summary>
     Task<IReadOnlyList<string>> SearchTermsAsync(string topic, CancellationToken ct);
 
+    /// <summary>A few shots to film for each beat of the lesson's structure where footage belongs, before filming it.</summary>
+    Task<IReadOnlyList<Shot>> SuggestShotsAsync(Lesson lesson, CancellationToken ct);
+
     /// <summary>Titles, a description and tags to upload with the finished video, written from its script.</summary>
     Task<PublishNotes> WritePublishNotesAsync(Episode episode, CancellationToken ct);
 

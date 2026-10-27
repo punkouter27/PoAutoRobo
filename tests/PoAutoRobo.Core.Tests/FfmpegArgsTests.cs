@@ -74,7 +74,9 @@ public sealed class FfmpegArgsTests : IDisposable
             $"--- intro laid out about its centre: the mascot above the words ---\n{Lines(FfmpegArgs.IntroVideo(full with { Layout = IntroLayout.Centre }, "intro_channel.txt", "intro_tagline.txt", "intro_title.txt", S(5), ExportPreset.Hd30, "intro.mp4"))}\n" +
             $"--- intro with its words on a band across the lower third ---\n{Lines(FfmpegArgs.IntroVideo(full with { Layout = IntroLayout.Lower }, "intro_channel.txt", "intro_tagline.txt", "intro_title.txt", S(5), ExportPreset.Hd30, "intro.mp4"))}\n" +
             $"--- outro ---\n{outro}\n" +
-            $"--- outro, channel name only ---\n{Lines(FfmpegArgs.OutroVideo(bare, "outro_channel.txt", null, S(8), ExportPreset.Hd30, "outro.mp4"))}");
+            $"--- outro, channel name only ---\n{Lines(FfmpegArgs.OutroVideo(bare, "outro_channel.txt", null, S(8), ExportPreset.Hd30, "outro.mp4"))}\n" +
+            $"--- the swarm with the film finish: on its background, as the card brings its own ---\n{Lines(FfmpegArgs.SwarmIntroVideo(full with { Grain = true }, "intro.mp4", new ExportPreset(1280, 720, 30), S(5), ExportPreset.Hd30, "swarm.mp4"))}\n" +
+            $"--- outro with the film finish ---\n{Lines(FfmpegArgs.OutroVideo(bare with { Grain = true }, "outro_channel.txt", null, S(8), ExportPreset.Hd30, "outro.mp4"))}");
     }
 
     [Fact]
@@ -100,8 +102,20 @@ public sealed class FfmpegArgsTests : IDisposable
     }
 
     [Fact]
-    public Task Captioned_clip_burns_its_own_captions_and_fades_in_and_out() =>
-        Verify(Lines(FfmpegArgs.ClipVideo(ClipSource.Image, "panel.png", S(20), ExportPreset.Hd30, "clip_00.mp4", "captions_00.ass")));
+    public Task Captioned_clip_burns_its_own_captions_and_fades_in_and_out()
+    {
+        // A clip opening a beat: frosted glass behind its strap under the captions, the film finish, and a streak of light
+        // in the series colour crossing even the fade up from black.
+        var polish = new Polish("#22CC88", Grain: true, NewBeat: true, Strap: "Try");
+        var opening = Lines(FfmpegArgs.ClipVideo(ClipSource.Image, "panel.png", S(20), ExportPreset.Hd30, "clip_00.mp4", "captions_00.ass", polish: polish));
+        Assert.True(opening.IndexOf("[pane]", StringComparison.Ordinal) < opening.IndexOf("ass=", StringComparison.Ordinal));
+        Assert.True(opening.IndexOf("fade=t=out:st=19.750", StringComparison.Ordinal) < opening.IndexOf("[streak]", StringComparison.Ordinal));
+        Assert.Contains("[unlit][streak]overlay", Lines(FfmpegArgs.PanelsVideo(["a.png", "b.png"], S(9), ExportPreset.Hd30, "p.mp4", polish: polish)));
+        Assert.Contains("vignette", Lines(FfmpegArgs.ParallaxVideo("bg.png", "fg.png", S(9), ExportPreset.Hd30, "l.mp4", polish: polish)));
+
+        return Verify(Lines(FfmpegArgs.ClipVideo(ClipSource.Image, "panel.png", S(20), ExportPreset.Hd30, "clip_00.mp4", "captions_00.ass"))
+            + "\n--- opening a beat, with the film finish ---\n" + opening);
+    }
 
     [Fact]
     public Task Join_copies_the_finished_pictures_and_crossfades_and_normalises_the_narration()

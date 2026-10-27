@@ -11,10 +11,11 @@ public sealed class VoiceTests : IDisposable
     public void Dispose() => Directory.Delete(_folder, recursive: true);
 
     [Fact]
-    public void The_voice_document_is_well_formed_and_spoken_punctuation_joins_the_word_before_it()
+    public async Task The_voice_document_is_well_formed_and_audio_length_is_read_from_the_file_and_agrees_with_its_timings()
     {
         The_voice_document_names_voice_style_and_rate_and_dialogue_cannot_add_markup_to_it();
         Punctuation_marks_join_the_word_before_them();
+        await Audio_length_is_read_from_the_file_and_the_mock_narrator_writes_audio_that_agrees_with_its_timings();
     }
 
     private void The_voice_document_names_voice_style_and_rate_and_dialogue_cannot_add_markup_to_it()
@@ -96,8 +97,7 @@ public sealed class VoiceTests : IDisposable
         w.Write("data"u8); w.Write(dataBytes); w.Write(new byte[dataBytes]);
     }
 
-    [Fact]
-    public async Task Audio_length_is_read_from_the_file_and_the_mock_narrator_writes_audio_that_agrees_with_its_timings()
+    private async Task Audio_length_is_read_from_the_file_and_the_mock_narrator_writes_audio_that_agrees_with_its_timings()
     {
         Wav_duration_is_read_from_the_header_and_a_file_that_is_not_a_wav_is_rejected();
         await Mock_narrator_writes_audio_whose_length_and_word_timings_agree_and_a_faster_rate_shortens_it();

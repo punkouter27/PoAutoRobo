@@ -80,7 +80,7 @@ public sealed class MediaCacheTests : IDisposable
     }
 
     [Fact]
-    public async Task A_refused_picture_leaves_the_clip_as_it_was_and_nothing_half_written_in_the_cache()
+    public async Task A_refusal_is_reported_in_the_services_own_words_is_not_retried_and_leaves_the_clip_and_the_cache_as_they_were()
     {
         var refusing = Substitute.For<ImageMaker>(); // a fresh one: reconfiguring the shared substitute would run its file-writing callback
         refusing.Invoke(default!, default!, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("The picture was blocked by the content filter."));
@@ -90,6 +90,7 @@ public sealed class MediaCacheTests : IDisposable
         Assert.Contains("content filter", error.Message);
         Assert.Empty(Directory.Exists(Path.Combine(_folder, "images")) ? Directory.GetFiles(Path.Combine(_folder, "images")) : []);
         Assert.Equal(0, _made);
+        await A_service_refusal_is_reported_in_its_own_words_is_not_retried_and_writes_no_file();
     }
 
     // ---- The Azure request itself ----
@@ -149,8 +150,7 @@ public sealed class MediaCacheTests : IDisposable
         Assert.Contains("\u0001\u0002\u0003", handler.Sent); // the sheet's bytes
     }
 
-    [Fact]
-    public async Task A_service_refusal_is_reported_in_its_own_words_is_not_retried_and_writes_no_file()
+    private async Task A_service_refusal_is_reported_in_its_own_words_is_not_retried_and_writes_no_file()
     {
         var handler = new Scripted((HttpStatusCode.BadRequest, """{ "error": { "code": "content_policy_violation", "message": "Your request was rejected by the safety system." } }""", null));
 

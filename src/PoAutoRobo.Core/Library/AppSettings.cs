@@ -69,6 +69,17 @@ public sealed record AppSettings(Uri? Endpoint, string? GitHubToken)
     /// <summary>Key for the Pexels stock photo library; null when there is none and stock photos are not offered.</summary>
     public string? PexelsKey { get; init; } = Named("POAUTOROBO_PEXELS_KEY");
 
+    /// <summary>
+    /// The app's Google sign-in (an OAuth client of the "Desktop app" kind), for uploading to YouTube. Each is null when
+    /// neither its environment variable nor the vault has it, and uploading is then not offered. The variable wins.
+    /// </summary>
+    public string? YouTubeClientId { get; init; } = Named("POAUTOROBO_YOUTUBE_CLIENT_ID");
+
+    public string? YouTubeClientSecret { get; init; } = Named("POAUTOROBO_YOUTUBE_CLIENT_SECRET");
+
+    /// <summary>The vault's names for <see cref="YouTubeClientId"/> and <see cref="YouTubeClientSecret"/>.</summary>
+    public const string YouTubeIdSecret = "YouTube--ClientId", YouTubeSecretSecret = "YouTube--ClientSecret";
+
     /// <summary>The variables that switch the optional services; one that is set wins over the switch in Settings.</summary>
     public static readonly string[] ServiceVariables = ["POAUTOROBO_VIDEO_MODEL", "POAUTOROBO_LOCAL_MODEL", "POAUTOROBO_EMBEDDING_MODEL"];
 
@@ -93,8 +104,10 @@ public sealed record AppSettings(Uri? Endpoint, string? GitHubToken)
         {
             // Fetched together: each is a separate round trip made before the window can appear.
             var (endpoint, gitHub, pexels) = (Get("AzureOpenAI--Endpoint"), Get("GitHub--PAT"), Get("Pexels--ApiKey"));
-            await Task.WhenAll(endpoint, gitHub, pexels);
+            var (youTubeId, youTubeSecret) = (Get(YouTubeIdSecret), Get(YouTubeSecretSecret));
+            await Task.WhenAll(endpoint, gitHub, pexels, youTubeId, youTubeSecret);
             var settings = new AppSettings(Uri.TryCreate(await endpoint, UriKind.Absolute, out var uri) ? uri : null, await gitHub);
+            settings = settings with { YouTubeClientId = settings.YouTubeClientId ?? await youTubeId, YouTubeClientSecret = settings.YouTubeClientSecret ?? await youTubeSecret };
             return await pexels is { } key ? settings with { PexelsKey = key } : settings; // the environment variable stands when the vault has none
         }
         catch (Exception e) when (e is not OperationCanceledException)

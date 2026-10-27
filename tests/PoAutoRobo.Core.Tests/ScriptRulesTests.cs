@@ -14,10 +14,11 @@ public sealed class ScriptRulesTests
     }
 
     [Fact]
-    public async Task Mock_episode_has_the_length_asked_for_with_three_tiers_all_in_range_and_tier_b_active()
+    public async Task Mock_episodes_have_the_length_and_tiers_asked_for_and_the_mock_writer_rewrites_to_length_and_checks_drift()
     {
         await Mock_episode_has_the_length_asked_for_with_three_tiers_all_in_range_and_tier_b_activeCase(1, 1, 1); // quick test: one clip, about half a minute
         await Mock_episode_has_the_length_asked_for_with_three_tiers_all_in_range_and_tier_b_activeCase(6, 10, 8); // standard
+        await Mock_writer_rewrites_to_the_requested_word_count_and_its_drift_check_ignores_phrasing_but_catches_a_new_subject();
     }
 
     private async Task Mock_episode_has_the_length_asked_for_with_three_tiers_all_in_range_and_tier_b_activeCase(int min, int max, int expected)
@@ -132,8 +133,7 @@ public sealed class ScriptRulesTests
         Assert.Equal("longer than the 5 minute target", Durations.RuntimeWarning(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(0.4)));
     }
 
-    [Fact]
-    public async Task Mock_writer_rewrites_to_the_requested_word_count_and_its_drift_check_ignores_phrasing_but_catches_a_new_subject()
+    private async Task Mock_writer_rewrites_to_the_requested_word_count_and_its_drift_check_ignores_phrasing_but_catches_a_new_subject()
     {
         var writer = new MockScriptWriter();
         const string original = "The robot is balancing on one foot while the controller corrects its ankle torque.";

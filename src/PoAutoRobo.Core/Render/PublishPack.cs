@@ -6,9 +6,28 @@ namespace PoAutoRobo.Core.Render;
 /// <summary>The text files written beside a finished video so it is ready to upload.</summary>
 public static class PublishPack
 {
-    /// <summary>One line per clip, "0:00 Title", in the form video sites read as chapters.</summary>
-    public static string Chapters(IEnumerable<(TimeSpan Start, string Title)> clips) =>
-        string.Concat(clips.Select(c => $"{(int)c.Start.TotalMinutes}:{c.Start.Seconds:00} {c.Title}\n"));
+    /// <summary>YouTube shows no chapter shorter than this, and no list with one.</summary>
+    public static readonly TimeSpan MinChapter = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// The chapter list for a video description, "0:00 Title" a line, from where each stretch of the timeline starts;
+    /// stretches running on under the same title are one chapter. YouTube shows chapters only when the first is at
+    /// 0:00, there are at least three, and none is under ten seconds, so the shortest chapter joins the one before it
+    /// (the first joins the one after) until none is too short. Fewer than three left gives no list at all: empty.
+    /// </summary>
+    /// <param name="end">Where the video ends, which is where the last chapter does.</param>
+    public static string Chapters(IEnumerable<(TimeSpan Start, string Title)> marks, TimeSpan end)
+    {
+        var chapters = new List<(TimeSpan Start, string Title)>();
+        foreach (var mark in marks)
+            if (chapters.Count == 0 || chapters[^1].Title != mark.Title) chapters.Add(mark);
+        TimeSpan Length(int i) => (i + 1 < chapters.Count ? chapters[i + 1].Start : end) - (i == 0 ? TimeSpan.Zero : chapters[i].Start);
+        while (chapters.Count > 1 && Enumerable.Range(0, chapters.Count).MinBy(Length) is var shortest && Length(shortest) < MinChapter)
+            chapters.RemoveAt(shortest);
+        if (chapters.Count < 3) return "";
+        chapters[0] = (TimeSpan.Zero, chapters[0].Title); // what came before the first chapter left is now in it
+        return string.Concat(chapters.Select(c => $"{(int)c.Start.TotalMinutes}:{c.Start.Seconds:00} {c.Title}\n"));
+    }
 
     /// <summary>Title choices, description, tags and hashtags, laid out to copy into an upload form.</summary>
     public static string Description(PublishNotes notes) =>

@@ -38,8 +38,7 @@ public sealed class ConformanceTests
         Assert.NotEqual(Words(60), fit.Dialogue);
     }
 
-    [Fact]
-    public async Task Narration_that_already_fits_is_left_alone()
+    private async Task Narration_that_already_fits_is_left_alone()
     {
         var writer = WriterOffBy(1.0);
 
@@ -51,7 +50,7 @@ public sealed class ConformanceTests
     }
 
     [Fact]
-    public async Task After_three_rewrites_the_speaking_rate_closes_the_remaining_gap()
+    public async Task After_three_rewrites_the_speaking_rate_closes_the_gap_and_when_nothing_gets_close_the_closest_attempt_is_kept()
     {
         // Always exactly 24 words = 8.0s, whatever is asked. Footage is 9.2s: rewrites cannot hit it, a slower pace can.
         var writer = Substitute.For<IScriptWriter>();
@@ -63,10 +62,10 @@ public sealed class ConformanceTests
         Assert.True(fit.WithinTolerance);
         Assert.InRange(fit.Rate, 0.9, 1.1);
         Assert.NotEqual(1.0, fit.Rate);
+        await When_nothing_gets_close_the_closest_attempt_is_kept_and_the_gap_reported();
     }
 
-    [Fact]
-    public async Task When_nothing_gets_close_the_closest_attempt_is_kept_and_the_gap_reported()
+    private async Task When_nothing_gets_close_the_closest_attempt_is_kept_and_the_gap_reported()
     {
         var writer = Substitute.For<IScriptWriter>();
         writer.RewriteToLengthAsync(default!, default, default).ReturnsForAnyArgs(Words(30)); // 10s, footage is 40s
@@ -80,12 +79,13 @@ public sealed class ConformanceTests
     }
 
     [Fact]
-    public async Task Footage_outside_5_to_120_seconds_is_rejected_before_any_work()
+    public async Task Footage_outside_5_to_120_seconds_is_rejected_before_any_work_and_narration_that_already_fits_is_left_alone()
     {
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Conformance.FitAsync(Words(60), S(4.9), WriterOffBy(1.0), Speak, Ct));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => Conformance.FitAsync(Words(60), S(120.1), WriterOffBy(1.0), Speak, Ct));
 
         Assert.Equal(0, _spoken);
+        await Narration_that_already_fits_is_left_alone();
     }
 
     /// <summary>Opt-in: the real writer and voice fitting a real line to longer and shorter footage (success criterion 7).</summary>

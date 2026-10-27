@@ -87,8 +87,11 @@ public static partial class AssCaptions
             .AppendLine("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding")
             .AppendLine($"Style: Default,{look.Font},{look.FontSize},{text},{text},{box},{box},-1,0,0,0,100,100,0,0,{(look.Boxed ? 3 : 1)},{look.Outline},0,2,80,80,{(portrait ? 300 : 90)},1");
         var name = strap is null ? "" : Clean(strap).Trim();
-        if (name.Length > 0) // the strap: dark capitals on a box of the accent colour, top left, clear of the captions at the bottom
-            ass.AppendLine($"Style: Strap,{look.Font},{(portrait ? 52 : 44)},{Black},{Black},{accent},{accent},-1,0,0,0,100,100,2,0,3,14,0,7,80,80,80,1");
+        // The strap: dark capitals on a box of the accent colour, top left, clear of the captions at the bottom. The box
+        // lets a little through, so the frosted glass the clip draws behind it shows (see FfmpegArgs.Glass).
+        var tinted = "&H50" + accent[4..];
+        if (name.Length > 0)
+            ass.AppendLine($"Style: Strap,{look.Font},{(portrait ? 52 : 44)},{Black},{Black},{tinted},{tinted},-1,0,0,0,100,100,2,0,3,14,0,7,80,80,80,1");
         ass.AppendLine()
             .AppendLine("[Events]")
             .AppendLine("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text");

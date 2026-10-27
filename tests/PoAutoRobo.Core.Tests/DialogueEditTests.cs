@@ -21,8 +21,7 @@ public sealed class DialogueEditTests : IDisposable
 
     private Clip Target => _episode.Clips[1];
 
-    [Fact]
-    public async Task Edit_replaces_the_active_tier_for_that_clip_only_and_marks_the_picture_stale_only_when_the_subject_changed()
+    private async Task Edit_replaces_the_active_tier_for_that_clip_only_and_marks_the_picture_stale_only_when_the_subject_changed()
     {
         await Edit_replaces_the_active_tier_for_that_clip_only_and_marks_the_picture_stale_only_when_the_subject_changedCase(false); // a phrasing change keeps the picture
         await Edit_replaces_the_active_tier_for_that_clip_only_and_marks_the_picture_stale_only_when_the_subject_changedCase(true); // a new action, tool or subject marks it out of date
@@ -44,7 +43,7 @@ public sealed class DialogueEditTests : IDisposable
     }
 
     [Fact]
-    public async Task Unchanged_or_whitespace_only_edit_does_nothing_and_asks_nobody_and_empty_dialogue_is_rejected()
+    public async Task An_edit_replaces_the_active_tier_of_that_clip_alone_marks_the_picture_stale_only_when_the_subject_changed_and_takes_empty_words_only_over_a_films_own_sound()
     {
         var same = await EpisodeEditor.EditDialogueAsync(_episode, Target.Id, "  " + Target.Active.Dialogue + "\n", _writer, Ct);
 
@@ -56,6 +55,10 @@ public sealed class DialogueEditTests : IDisposable
         Assert.False(touched.Clips[1].Visual.Stale);
         await _writer.DidNotReceiveWithAnyArgs().CoreChangedAsync(default!, default!, default);
         await Assert.ThrowsAsync<ArgumentException>(() => EpisodeEditor.EditDialogueAsync(_episode, Target.Id, "   ", _writer, Ct));
+        // Over a film's own sound the words are only captions, so they may be cleared.
+        var film = EpisodeEditor.Update(_episode, Target.Id, c => c with { OwnSound = true });
+        Assert.Equal("", (await EpisodeEditor.EditDialogueAsync(film, Target.Id, "  ", _writer, Ct)).Clips[1].Active.Dialogue);
+        await Edit_replaces_the_active_tier_for_that_clip_only_and_marks_the_picture_stale_only_when_the_subject_changed();
     }
 
     [Fact]

@@ -75,13 +75,18 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
         // Numbered, so the series' videos sort in order wherever they are put.
         var number = episode.Number > 0 ? $"{episode.Number:00}-" : "";
         var output = Path.Combine(folder, "export", $"{number}{ProjectStore.Slug(episode.Title)}-{preset.Height}p{preset.Fps}.mp4");
-        var (segments, marks) = await RenderAsync(episode, folder, preset, captions, brand, output, progress, ct);
+        var (segments, marks, end) = await RenderAsync(episode, folder, preset, captions, brand, output, progress, ct);
 
-        // Beside the video, ready to upload with it: chapter list, subtitles and a cover picture. YouTube shows chapters
-        // only when the first starts at 0:00 and none is under ten seconds, so the intro and outro join their neighbours'.
+        // Beside the video, ready to upload with it: chapter list, subtitles and a cover picture. A chapter to each
+        // beat, as the finished timeline has them, and the intro and outro; one too short for YouTube joins its
+        // neighbour, and too few chapters for YouTube means no list, so none is left from an earlier render.
         var name = Path.ChangeExtension(output, null);
-        var chapters = marks.Where(m => !m.Bookend).Select((m, i) => (i == 0 ? TimeSpan.Zero : m.Start, m.Title));
-        await File.WriteAllTextAsync(name + ".chapters.txt", PublishPack.Chapters(chapters), ct);
+        var intro = marks.Count > episode.Clips.Count ? 1 : 0;
+        var chapters = PublishPack.Chapters(marks.Select((m, i) => (m.Start, m.Bookend ? m.Title : episode.Clips[i - intro].Beat ?? m.Title)), end);
+        if (chapters.Length > 0)
+            await File.WriteAllTextAsync(name + ".chapters.txt", chapters, ct);
+        else
+            File.Delete(name + ".chapters.txt");
         await File.WriteAllTextAsync(name + ".srt", PublishPack.Srt(segments), ct);
         if (episode.Cover() is { } cover)
             File.Copy(cover, name + ".thumbnail.png", overwrite: true);
@@ -105,7 +110,7 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
         try
         {
             CopyTitleFont(work);
-            var picture = (await DrawClipsAsync(episode, _ => narration.Words, _ => slot, Draft, null, [index], work, cache, null, ct))[index]!;
+            var picture = (await DrawClipsAsync(episode, _ => narration.Words, _ => slot, Draft, null, brand, [index], work, cache, null, ct))[index]!;
             return await cache.GetOrCreateAsync(["clip with its sound", picture, narration.AudioPath], ".mp4", scratch =>
                 ffmpeg.RunAsync(FfmpegArgs.Mux(picture, narration.AudioPath, scratch), work, null, null, ct));
         }
@@ -134,11 +139,11 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
     public async Task<Preview> PreviewAsync(Episode episode, string folder, Brand? brand, IProgress<RenderProgress>? progress, CancellationToken ct)
     {
         var output = Path.Combine(folder, "export", "preview.mp4");
-        var (segments, marks) = await RenderAsync(episode, folder, Draft, null, brand, output, progress, ct);
+        var (segments, marks, _) = await RenderAsync(episode, folder, Draft, null, brand, output, progress, ct);
         return new Preview(output, segments, marks);
     }
 
-    private async Task<(IReadOnlyList<CaptionSegment> Segments, IReadOnlyList<ClipMark> Marks)> RenderAsync(
+    private async Task<(IReadOnlyList<CaptionSegment> Segments, IReadOnlyList<ClipMark> Marks, TimeSpan End)> RenderAsync(
         Episode episode, string folder, ExportPreset preset, CaptionStyle? captions, Brand? brand, string output, IProgress<RenderProgress>? progress, CancellationToken ct)
     {
         // The job has three stages. Their shares of the bar are rough but fixed, so it only ever moves forward.
@@ -168,7 +173,7 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
             var segments = narrations.Select((n, i) => new CaptionSegment(slots[i + first].Start, n.Words)).ToList();
 
             CopyTitleFont(work);
-            var pictures = await DrawClipsAsync(episode, i => narrations[i].Words, i => slots[i + first], preset, captions, [.. Enumerable.Range(0, count)], work, cache,
+            var pictures = await DrawClipsAsync(episode, i => narrations[i].Words, i => slots[i + first], preset, captions, brand, [.. Enumerable.Range(0, count)], work, cache,
                 (activity, fraction, clips) => progress?.Report(new RenderProgress(activity, VoiceShare + DrawShare * fraction, clips)), ct);
 
             // The bookends' pictures run exactly their slots, which the crossfade into the next clip shortens a little.
@@ -195,7 +200,7 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
                 marks.Insert(0, new ClipMark("Intro", TimeSpan.Zero, sounds[0].AudioPath, Bookend: true));
                 marks.Add(new ClipMark("Outro", slots[^1].Start, sounds[^1].AudioPath, Bookend: true));
             }
-            return (segments, marks);
+            return (segments, marks, total);
         }
         finally
         {
@@ -213,7 +218,7 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
     /// <param name="which">The places of the clips to draw; the others are left null.</param>
     /// <param name="report">Told how the drawing is going: in words, how far through it is (0 to 1), and how far each clip has got.</param>
     private async Task<string?[]> DrawClipsAsync(Episode episode, Func<int, IReadOnlyList<WordTiming>> wordsOf, Func<int, Slot> slotOf, ExportPreset preset, CaptionStyle? captions,
-        IReadOnlyList<int> which, string work, MediaCache cache, Action<string, double, double[]>? report, CancellationToken ct)
+        Brand? brand, IReadOnlyList<int> which, string work, MediaCache cache, Action<string, double, double[]>? report, CancellationToken ct)
     {
         var count = episode.Clips.Count;
         var pictures = new string?[count];
@@ -251,22 +256,25 @@ public sealed partial class EpisodeBuilder(INarrator narrator, FfmpegRunner ffmp
                 await File.WriteAllTextAsync(Path.Combine(work, eye.LabelFile), label, token);
                 made.Add(label);
             }
+            // The first clip of each beat (but the very first, which the intro carries in) opens with a streak of light,
+            // and names the beat with a strap on frosted glass, so the viewer sees where the episode has got to.
+            var newBeat = clip.Beat is { } beat && (i == 0 || episode.Clips[i - 1].Beat != beat) ? beat : null;
+            var polish = new Polish(brand?.Kit.Captions.AccentColor ?? new CaptionStyle().AccentColor, brand?.Kit.Grain == true, NewBeat: newBeat is not null && i > 0);
             string? captionFile = null;
             if (captions is not null)
             {
                 captionFile = $"captions_{i:00}.ass"; // timed from the start of this clip
-                // The first clip of each beat names it with a strap, so the viewer sees where the episode has got to.
                 // ponytail: burned in with the captions, so the preview (captions drawn live) shows none; draw it there too if it is missed.
-                var strap = clip.Beat is { } beat && (i == 0 || episode.Clips[i - 1].Beat != beat) ? beat : null;
-                var text = AssCaptions.Build([new CaptionSegment(TimeSpan.Zero, wordsOf(i))], captions, preset.Portrait, strap);
+                var text = AssCaptions.Build([new CaptionSegment(TimeSpan.Zero, wordsOf(i))], captions, preset.Portrait, newBeat);
                 await File.WriteAllTextAsync(Path.Combine(work, captionFile), text, token);
                 made.Add(text);
+                polish = polish with { Strap = newBeat };
             }
             // The camera move comes from the clip itself, so a clip keeps its move when the order changes.
             IReadOnlyList<string> Args(string to) =>
-                panels.Count == 2 && clip.Visual.Kind == VisualKind.Parallax ? FfmpegArgs.ParallaxVideo(panels[0], panels[1], slot.VideoLength, preset, to, captionFile)
-                : panels.Count > 1 ? FfmpegArgs.PanelsVideo(panels, slot.VideoLength, preset, to, captionFile)
-                : FfmpegArgs.ClipVideo(source, input, slot.VideoLength, preset, to, captionFile, clip.Id.ToByteArray()[0] % 4, eye);
+                panels.Count == 2 && clip.Visual.Kind == VisualKind.Parallax ? FfmpegArgs.ParallaxVideo(panels[0], panels[1], slot.VideoLength, preset, to, captionFile, polish)
+                : panels.Count > 1 ? FfmpegArgs.PanelsVideo(panels, slot.VideoLength, preset, to, captionFile, polish)
+                : FfmpegArgs.ClipVideo(source, input, slot.VideoLength, preset, to, captionFile, clip.Id.ToByteArray()[0] % 4, eye, polish);
             // The scratch files are named for the clip's place in the order; that is taken out so a moved clip is still found.
             var command = string.Join('\n', Args("clip.mp4")).Replace($"_{i:00}.", "_.");
 

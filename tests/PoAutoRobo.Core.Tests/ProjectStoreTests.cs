@@ -29,8 +29,8 @@ public sealed class ProjectStoreTests : IDisposable
             Captions = new CaptionStyle(CaptionPreset.ComicBanner, 72, "#11AAFF", 6),
         };
         episode = EpisodeEditor.Reorder(episode, [.. episode.Clips.Reverse().Select(c => c.Id)]);
-        episode = Change(episode, 0, c => c with { Visual = new VisualSpec(VisualKind.Still, MediaPaths: ["a.png"], Stale: true) });
-        episode = EpisodeEditor.AttachVideo(episode, episode.Clips[1].Id, "lab.mp4", new FitResult("Fitted.", 1.05, TimeSpan.FromSeconds(9), TimeSpan.Zero, true));
+        episode = Change(episode, 0, c => c with { Visual = new VisualSpec(VisualKind.Still, MediaPaths: [Path.Combine(_folder, "a.png")], Stale: true) });
+        episode = EpisodeEditor.AttachVideo(episode, episode.Clips[1].Id, Path.Combine(_folder, "lab.mp4"), new FitResult("Fitted.", 1.05, TimeSpan.FromSeconds(9), TimeSpan.Zero, true));
         episode = EpisodeEditor.SetHostVisible(EpisodeEditor.SetTier(episode, episode.Clips[2].Id, Tier.C), episode.Clips[2].Id, false);
         // As a live script arrives: depth B only. The other depths are written on demand, so their absence is not damage.
         episode = Change(episode, 3, c => c with { Scripts = new Dictionary<Tier, TierScript> { [Tier.B] = c.Scripts[Tier.B] } });
@@ -46,7 +46,7 @@ public sealed class ProjectStoreTests : IDisposable
     }
 
     [Fact]
-    public void A_missing_or_corrupt_file_is_reported_and_the_backup_restores_the_previous_save()
+    public void A_missing_corrupt_or_malformed_file_is_reported_as_damaged_and_the_backup_restores_the_previous_save()
     {
         Assert.Throws<InvalidDataException>(() => ProjectStore.Load(_folder)); // nothing saved yet
 
@@ -64,6 +64,7 @@ public sealed class ProjectStoreTests : IDisposable
         File.WriteAllText(path, File.ReadAllText(path).Replace("\"Title\": \"Balance\",", "\"Title\": \"Balance\", \"Subject\": \"Essay\","));
         Assert.Contains("Essay", File.ReadAllText(path));
         Assert.Equal(first.Title, ProjectStore.Load(_folder).Title);
+        A_malformed_episode_file_is_reported_as_damaged_instead_of_crashing_later();
     }
 
     // ---- An episode file can be edited by anyone who can reach the folder, so it is not trusted ----
@@ -74,25 +75,27 @@ public sealed class ProjectStoreTests : IDisposable
         Media_outside_the_episode_folder_is_dropped_on_load_and_media_inside_it_is_keptCase(@"\\attacker\share\a.png");
         Media_outside_the_episode_folder_is_dropped_on_load_and_media_inside_it_is_keptCase(@"C:\Windows\win.ini");
         Media_outside_the_episode_folder_is_dropped_on_load_and_media_inside_it_is_keptCase(@"..\..\outside.png");
+        // Not written in full, so read from wherever the app is running: the current folder, or a drive's current folder.
+        Media_outside_the_episode_folder_is_dropped_on_load_and_media_inside_it_is_keptCase(@"images\ok.png");
+        Media_outside_the_episode_folder_is_dropped_on_load_and_media_inside_it_is_keptCase(Path.GetPathRoot(_folder)![..2] + "x.png");
     }
 
     private void Media_outside_the_episode_folder_is_dropped_on_load_and_media_inside_it_is_keptCase(string outside)
     {
         var inside = Path.Combine(_folder, "images", "abc.png");
-        var episode = Change(NewEpisode(2), 0, c => c with { Visual = new VisualSpec(VisualKind.MultiPanel, MediaPaths: [outside, @"images\ok.png", inside]) });
-        episode = Change(episode, 1, c => c with { NarrationRate = 1.05, Visual = new VisualSpec(VisualKind.UserVideo, KindLocked: true, UserVideoPath: outside) });
+        var episode = Change(NewEpisode(2), 0, c => c with { Visual = new VisualSpec(VisualKind.MultiPanel, MediaPaths: [outside, inside]) });
+        episode = Change(episode, 1, c => c with { NarrationRate = 1.05, OwnSound = true, RobotView = true, Visual = new VisualSpec(VisualKind.UserVideo, KindLocked: true, UserVideoPath: outside) });
         ProjectStore.Save(episode, _folder);
 
         var loaded = ProjectStore.Load(_folder);
 
-        Assert.Equal([@"images\ok.png", inside], loaded.Clips[0].Visual.MediaPaths); // relative or absolute, as long as it is inside
-        // Footage that cannot be trusted turns the clip back into a title card at normal pace.
+        Assert.Equal([inside], loaded.Clips[0].Visual.MediaPaths);
+        // Footage that cannot be trusted turns the clip back into a narrated title card at normal pace, as removing it does.
         Assert.Equal(new VisualSpec(VisualKind.TitleCard), loaded.Clips[1].Visual);
-        Assert.Equal(1.0, loaded.Clips[1].NarrationRate);
+        Assert.Equal((1.0, false, false), (loaded.Clips[1].NarrationRate, loaded.Clips[1].OwnSound, loaded.Clips[1].RobotView));
     }
 
-    [Fact]
-    public void A_malformed_episode_file_is_reported_as_damaged_instead_of_crashing_later()
+    private void A_malformed_episode_file_is_reported_as_damaged_instead_of_crashing_later()
     {
         string[] damaged =
         [
@@ -140,19 +143,20 @@ public sealed class ProjectStoreTests : IDisposable
     public void A_duplicate_gets_its_own_folder_and_title_points_at_its_own_media_and_leaves_the_finished_videos_behind()
     {
         var original = Path.Combine(_folder, "balance");
-        foreach (var file in new[] { @"images\a.png", @"imports\lab.mp4", @"export\balance-1080p30.mp4" })
+        foreach (var file in new[] { @"images\a.png", @"imports\lab.mp4", @"export\balance-1080p30.mp4", SpendLog.FileName })
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(original, file))!);
             File.WriteAllText(Path.Combine(original, file), file);
         }
         var episode = Change(NewEpisode(2), 0, c => c with { Visual = new VisualSpec(VisualKind.Still, MediaPaths: [Path.Combine(original, @"images\a.png")]) });
-        episode = Change(episode, 1, c => c with { Visual = new VisualSpec(VisualKind.UserVideo, KindLocked: true, UserVideoPath: @"imports\lab.mp4") });
+        episode = Change(episode, 1, c => c with { Visual = new VisualSpec(VisualKind.UserVideo, KindLocked: true, UserVideoPath: Path.Combine(original, @"imports\lab.mp4")) });
         ProjectStore.Save(episode, original);
 
         var copy = ProjectStore.Duplicate(original, _folder);
 
         Assert.Equal(Path.Combine(_folder, "balance-copy"), copy);
         Assert.False(Directory.Exists(Path.Combine(copy, "export")));
+        Assert.False(File.Exists(Path.Combine(copy, SpendLog.FileName))); // what the original cost is not counted twice
         var loaded = ProjectStore.Load(copy);
         Assert.Equal("Balance copy", loaded.Title);
         Assert.Equal(episode.Clips.Select(c => c.Id), loaded.Clips.Select(c => c.Id));

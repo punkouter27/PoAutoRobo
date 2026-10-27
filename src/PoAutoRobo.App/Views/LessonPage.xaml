@@ -96,6 +96,21 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <!-- Before filming: what to film for each beat that wants footage, ticked off as it is filmed -->
+                    <Grid>
+                        <TextBlock Text="Shots to film" VerticalAlignment="Center" />
+                        <Button x:Name="SuggestShotsButton" HorizontalAlignment="Right" Content="Suggest shots" Command="{x:Bind ViewModel.SuggestShotsCommand}"
+                                ToolTipService.ToolTip="Before you film: a short list of shots to film for each beat where your footage goes, from what you taught it. One small request to the script service, a fraction of a cent (free with a model on this computer); asked only when you press this." />
+                    </Grid>
+                    <ItemsControl x:Name="ShotList" ItemsSource="{x:Bind ViewModel.Shots}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ShotRow">
+                                <CheckBox IsChecked="{x:Bind Done, Mode=TwoWay}" ToolTipService.ToolTip="Tick it once it is filmed. The list is saved with the episode when the script is written.">
+                                    <TextBlock Text="{x:Bind Text}" TextWrapping="Wrap" />
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </ScrollViewer>
             <Button x:Name="CreateEpisodeButton" Grid.Row="1" MinHeight="44" ToolTipService.ToolTip="Write the script for this lesson (Ctrl+Enter). Progress is shown at the top, with a Cancel button." Content="Write the script" Style="{x:Bind app:Ui.Primary(ViewModel.WriteIsNext), Mode=OneWay}"

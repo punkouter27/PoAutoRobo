@@ -11,7 +11,7 @@
     PersistenceId="Main"
     Width="1280"
     Height="800"
-    MinWidth="960"
+    MinWidth="640"
     MinHeight="600">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -20,6 +20,8 @@
     <!-- Five steps: Intro, Lesson, Clips, Preview, Publish. One page shows at a time; the selector in the header moves
          between them, and the bar under it says what the step asks for. -->
 
+    <!-- Held in a plain control because the window-size states below only take effect under one, as on the pages. -->
+    <UserControl>
     <Grid x:Name="Root">
         <!-- In a small window the column beside each page gives some of its width back to the page. -->
         <VisualStateManager.VisualStateGroups>
@@ -31,7 +33,7 @@
                 </VisualState>
                 <VisualState x:Name="Tight">
                     <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="0" />
+                        <AdaptiveTrigger MinWindowWidth="860" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
                         <!-- The header's buttons keep their signs and lose their words, which are in their tooltips, so the episode's title has room. -->
@@ -39,6 +41,24 @@
                         <Setter Target="InspectorColumn.Width" Value="300" />
                         <Setter Target="PreviewColumn.Width" Value="240" />
                         <Setter Target="PublishColumn.Width" Value="240" />
+                    </VisualState.Setters>
+                </VisualState>
+                <!-- Narrower still: the same, and the step's checklist and its button drop to a line of their own under the steps. -->
+                <VisualState x:Name="Narrow">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="Commands.DefaultLabelPosition" Value="Collapsed" />
+                        <Setter Target="InspectorColumn.Width" Value="280" />
+                        <Setter Target="PreviewColumn.Width" Value="220" />
+                        <Setter Target="PublishColumn.Width" Value="240" />
+                        <Setter Target="GuideList.(Grid.Row)" Value="1" />
+                        <Setter Target="GuideList.(Grid.Column)" Value="0" />
+                        <Setter Target="GuideList.(Grid.ColumnSpan)" Value="2" />
+                        <Setter Target="GuideButton.(Grid.Row)" Value="1" />
+                        <Setter Target="StepSelector.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="StepSelector.HorizontalAlignment" Value="Left" />
                     </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
@@ -81,7 +101,20 @@
                            ToolTipService.ToolTip="Clips, length of the finished video (measured once a clip's voice is recorded, estimated from the word count until then), what the episode has cost, and how much the script and voice services have been used. Settings has the full breakdown." />
             </StackPanel>
 
+            <!-- The one bar of actions: the open step's own first, then those for the whole episode. What is seldom needed
+                 waits under …, and in a narrow window anything that does not fit moves there too. -->
             <CommandBar x:Name="Commands" Grid.Column="1" DefaultLabelPosition="Right" Background="Transparent" VerticalAlignment="Center" AutomationProperties.Name="Episode actions">
+                <!-- Publish: the teasers -->
+                <AppBarButton x:Name="SuggestTeasersButton" Label="Suggest teasers" Command="{x:Bind ViewModel.SuggestTeasersCommand}" Visibility="{x:Bind ViewModel.ShowPublish, Mode=OneWay}"
+                              ToolTipService.ToolTip="Three ten-second upright cuts of this episode for other video sites, each a hook over one to three moments. One quick request to the script service.">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE82F;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="RenderTeasersButton" Icon="Video" Label="{x:Bind ViewModel.RenderTeasersLabel, Mode=OneWay}" Command="{x:Bind ViewModel.RenderTeasersCommand}"
+                              Visibility="{x:Bind local:Ui.ShowBoth(ViewModel.ShowPublish, ViewModel.HasTeasers), Mode=OneWay}"
+                              ToolTipService.ToolTip="Builds each kept teaser as a 1080 by 1920 video in the episode's export folder, from the clips already made. Nothing new is paid for." />
+                <AppBarSeparator Visibility="{x:Bind ViewModel.ShowPublish, Mode=OneWay}" />
                 <AppBarButton x:Name="UndoButton" Icon="Undo" Label="Undo" LabelPosition="Collapsed" Command="{x:Bind ViewModel.UndoCommand}" ToolTipService.ToolTip="Undo the last change to the episode (Ctrl+Z)">
                     <AppBarButton.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="Z" />
@@ -95,6 +128,23 @@
                 <AppBarButton x:Name="SettingsButton" Icon="Setting" Label="Settings" LabelPosition="Collapsed" Click="OnSettings"
                               ToolTipService.ToolTip="Settings: picture quality, the monthly budget and what has been spent, advanced controls, and which services are on. Changes are kept for next time." />
                 <CommandBar.SecondaryCommands>
+                    <!-- Clips, with advanced controls on: each job that makes the episode, to start out of turn. The button
+                         under the bar already offers the next one, so most never need these. -->
+                    <AppBarButton x:Name="NarrateAllItem" Icon="Microphone" Label="Record voices" Command="{x:Bind ViewModel.NarrateAllCommand}"
+                                  Visibility="{x:Bind ViewModel.ShowJobs, Mode=OneWay}" IsEnabled="{x:Bind local:Ui.Not(ViewModel.IsWorking), Mode=OneWay}"
+                                  ToolTipService.ToolTip="Record every clip's voice now. Each card and the running time then show the real length, not an estimate, and previews build faster. You are shown the cost first." />
+                    <AppBarButton x:Name="GenerateAllItem" Icon="Pictures" Label="Generate pictures" Command="{x:Bind ViewModel.GenerateAllCommand}"
+                                  Visibility="{x:Bind ViewModel.ShowJobs, Mode=OneWay}" IsEnabled="{x:Bind local:Ui.Not(ViewModel.IsWorking), Mode=OneWay}"
+                                  ToolTipService.ToolTip="Draw a picture for every clip that needs one. You are shown the count and cost first; pictures you already have are reused free." />
+                    <AppBarButton x:Name="MakeDraftItem" Icon="View" Label="All of it: a draft to watch" Command="{x:Bind ViewModel.MakeDraftCommand}"
+                                  Visibility="{x:Bind ViewModel.ShowJobs, Mode=OneWay}" IsEnabled="{x:Bind local:Ui.Not(ViewModel.IsWorking), Mode=OneWay}"
+                                  ToolTipService.ToolTip="Every voice and picture still wanted, then the quick preview on the Preview step, to watch through before anything is rendered at full size. Asked once, with the cost." />
+                    <AppBarSeparator Visibility="{x:Bind ViewModel.ShowJobs, Mode=OneWay}" />
+                    <!-- Publish, once something is rendered -->
+                    <AppBarButton x:Name="ShowFilesItem" Icon="Folder" Label="Show the finished files" Command="{x:Bind ViewModel.ShowExportCommand}"
+                                  Visibility="{x:Bind local:Ui.ShowBoth(ViewModel.ShowPublish, ViewModel.HasExport), Mode=OneWay}"
+                                  ToolTipService.ToolTip="Open the folder holding the finished video and everything made to upload with it." />
+                    <AppBarSeparator Visibility="{x:Bind local:Ui.ShowBoth(ViewModel.ShowPublish, ViewModel.HasExport), Mode=OneWay}" />
                     <AppBarButton x:Name="RenameEpisodeItem" Label="Rename episode…" Command="{x:Bind ViewModel.RenameEpisodeCommand}"
                                   ToolTipService.ToolTip="Give the open episode a new title. It shows in the intro, the suggested titles and the list of saved episodes." />
                     <AppBarButton x:Name="CleanMediaItem" Label="Remove unused media…" Command="{x:Bind ViewModel.CleanMediaCommand}"
@@ -104,7 +154,11 @@
 
             <!-- The steps; then what this one asks for, each ticked off as it is done and the next one lit; and one button:
                  the next thing to do that has no button of its own on the page, or moving on once the step is done -->
-            <Grid x:Name="GuideBar" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,2,0,6" ColumnSpacing="{StaticResource GapLarge}">
+            <Grid x:Name="GuideBar" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,2,0,6" ColumnSpacing="{StaticResource GapLarge}" RowSpacing="{StaticResource GapSmall}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -138,41 +192,9 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource GapSmall}" VerticalAlignment="Center">
-                    <Button x:Name="GuideButton" Content="{x:Bind ViewModel.GuideActionLabel, Mode=OneWay}" Command="{x:Bind ViewModel.RunGuideActionCommand}"
-                            Visibility="{x:Bind ViewModel.HasGuideAction, Mode=OneWay}" Style="{x:Bind local:Ui.Primary(ViewModel.GuideActionIsNext), Mode=OneWay}"
-                            ToolTipService.ToolTip="The next thing this step needs, or the next step once this one is done. Lit when it is what to do now. Anything that costs money asks first and shows the cost." />
-                    <!-- On the clips page, with advanced controls on: each job of making the episode on its own, and all of them in one go.
-                         The button beside it already offers the next one. -->
-                    <DropDownButton x:Name="JobsButton" Visibility="{x:Bind ViewModel.ShowJobs, Mode=OneWay}" IsEnabled="{x:Bind local:Ui.Not(ViewModel.IsWorking), Mode=OneWay}"
-                                    AutomationProperties.Name="Jobs"
-                                    ToolTipService.ToolTip="Jobs: every job that makes the episode, to start one yourself out of turn: the voices, the pictures, or all of it in one go as a draft to watch. Each asks first and shows the cost.">
-                        <FontIcon Glyph="&#xE8FD;" FontSize="16" />
-                        <DropDownButton.Flyout>
-                            <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                <MenuFlyoutItem x:Name="NarrateAllItem" Text="Record voices" Command="{x:Bind ViewModel.NarrateAllCommand}"
-                                                ToolTipService.ToolTip="Record every clip's voice now. Each card and the running time then show the real length, not an estimate, and previews build faster.">
-                                    <MenuFlyoutItem.Icon>
-                                        <SymbolIcon Symbol="Microphone" />
-                                    </MenuFlyoutItem.Icon>
-                                </MenuFlyoutItem>
-                                <MenuFlyoutItem x:Name="GenerateAllItem" Text="Generate pictures" Command="{x:Bind ViewModel.GenerateAllCommand}"
-                                                ToolTipService.ToolTip="Draw a picture for every clip that needs one. You are shown the count and cost first; pictures you already have are reused free.">
-                                    <MenuFlyoutItem.Icon>
-                                        <SymbolIcon Symbol="Pictures" />
-                                    </MenuFlyoutItem.Icon>
-                                </MenuFlyoutItem>
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem x:Name="MakeDraftItem" Text="All of it: a draft to watch" Command="{x:Bind ViewModel.MakeDraftCommand}"
-                                                ToolTipService.ToolTip="Every voice and picture still wanted, then the quick preview on the Preview step, to watch through before anything is rendered at full size. Asked once, with the cost.">
-                                    <MenuFlyoutItem.Icon>
-                                        <SymbolIcon Symbol="View" />
-                                    </MenuFlyoutItem.Icon>
-                                </MenuFlyoutItem>
-                            </MenuFlyout>
-                        </DropDownButton.Flyout>
-                    </DropDownButton>
-                </StackPanel>
+                <Button x:Name="GuideButton" Grid.Column="2" VerticalAlignment="Center" Content="{x:Bind ViewModel.GuideActionLabel, Mode=OneWay}" Command="{x:Bind ViewModel.RunGuideActionCommand}"
+                        Visibility="{x:Bind ViewModel.HasGuideAction, Mode=OneWay}" Style="{x:Bind local:Ui.Primary(ViewModel.GuideActionIsNext), Mode=OneWay}"
+                        ToolTipService.ToolTip="The next thing this step needs, or the next step once this one is done. Lit when it is what to do now. Anything that costs money asks first and shows the cost." />
             </Grid>
         </Grid>
 
@@ -226,8 +248,8 @@
                         <GridView.ItemTemplate>
                             <DataTemplate x:DataType="x:String">
                                 <StackPanel Width="{StaticResource CardWidth}" Spacing="{StaticResource GapSmall}" Padding="4">
-                                    <Border Height="{StaticResource CardPictureHeight}" CornerRadius="4" Background="{StaticResource ShimmerBrush}" />
-                                    <Border Height="14" Width="150" CornerRadius="4" HorizontalAlignment="Left" Background="{StaticResource ShimmerBrush}"
+                                    <Border Height="{StaticResource CardPictureHeight}" CornerRadius="4" Background="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                    <Border Height="14" Width="150" CornerRadius="4" HorizontalAlignment="Left" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                             Visibility="{x:Bind local:Ui.HideText((x:String))}" />
                                     <TextBlock Text="{x:Bind}" Style="{ThemeResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"
                                                Visibility="{x:Bind local:Ui.ShowText((x:String))}" />
@@ -239,7 +261,7 @@
             </Grid>
 
             <!-- Step 4 · Preview: the preview takes the room there is, with its captions set on it; the outro's music sits beside it -->
-            <Grid x:Name="PreviewPage" Padding="{StaticResource PagePadding}" ColumnSpacing="{StaticResource GapLarge}" Visibility="{x:Bind local:Ui.ShowIf(ViewModel.Step, 3), Mode=OneWay}">
+            <Grid x:Name="PreviewPage" Padding="{StaticResource PagePadding}" ColumnSpacing="{StaticResource GapLarge}" Visibility="{x:Bind ViewModel.ShowPreview, Mode=OneWay}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition x:Name="PreviewColumn" Width="{StaticResource ExportColumn}" />
@@ -271,7 +293,7 @@
             </Grid>
 
             <!-- Step 5 · Publish: the teasers, ten-second upright cuts for other sites, as cards; the finished videos beside them -->
-            <Grid x:Name="PublishPage" Padding="{StaticResource PagePadding}" ColumnSpacing="{StaticResource GapLarge}" Visibility="{x:Bind local:Ui.ShowIf(ViewModel.Step, 4), Mode=OneWay}">
+            <Grid x:Name="PublishPage" Padding="{StaticResource PagePadding}" ColumnSpacing="{StaticResource GapLarge}" Visibility="{x:Bind ViewModel.ShowPublish, Mode=OneWay}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition x:Name="PublishColumn" Width="{StaticResource ExportColumn}" />
@@ -282,32 +304,20 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Grid ColumnSpacing="{StaticResource GapSmall}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Teasers" Style="{ThemeResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
-                        <Button x:Name="SuggestTeasersButton" Grid.Column="1" Content="Suggest teasers" Command="{x:Bind ViewModel.SuggestTeasersCommand}"
-                                ToolTipService.ToolTip="Three ten-second upright cuts of this episode for other video sites, each a hook over one to three moments. One quick request to the script service." />
-                        <Button x:Name="RenderTeasersButton" Grid.Column="2" Content="{x:Bind ViewModel.RenderTeasersLabel, Mode=OneWay}"
-                                Command="{x:Bind ViewModel.RenderTeasersCommand}" Visibility="{x:Bind ViewModel.HasTeasers, Mode=OneWay}"
-                                ToolTipService.ToolTip="Builds each kept teaser as a 1080 by 1920 video in the episode's export folder, from the clips already made. Nothing new is paid for." />
-                    </Grid>
+                    <TextBlock Text="Teasers" Style="{ThemeResource BodyStrongTextBlockStyle}" />
                     <TextBlock Grid.Row="1" Style="{StaticResource QuietText}"
-                               Text="Optional: three ten-second upright cuts of this episode for other video sites. Change a hook, untick the ones you do not want, then render the rest." />
-                    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled"
-                                  VerticalAlignment="Top" Visibility="{x:Bind ViewModel.HasTeasers, Mode=OneWay}">
+                               Text="Optional: three ten-second upright cuts of this episode for other video sites. Suggest them from the bar above, change a hook, untick the ones you do not want, then render the rest." />
+                    <!-- The cards wrap to the room there is and scroll down, never sideways -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Visibility="{x:Bind ViewModel.HasTeasers, Mode=OneWay}">
                             <ItemsControl x:Name="TeaserCardList" ItemsSource="{x:Bind ViewModel.TeaserCards}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource Gap}" />
+                                        <ItemsWrapGrid Orientation="Horizontal" />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:TeaserViewModel">
-                                        <Border Width="{StaticResource TeaserCardWidth}" CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                        <Border Width="{StaticResource TeaserCardWidth}" Margin="0,0,12,12" CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                             <Grid ColumnSpacing="10">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
@@ -382,22 +392,19 @@
                             <TextBlock Text="Finished video" Style="{ThemeResource BodyStrongTextBlockStyle}" />
                             <TextBlock Style="{StaticResource QuietText}"
                                        Text="{x:Bind ViewModel.MasterSizeText, Mode=OneWay}" />
+                            <views:PublishPanel ViewModel="{x:Bind ViewModel}" />
                         </StackPanel>
                     </ScrollViewer>
-                    <StackPanel Grid.Row="1" Spacing="{StaticResource GapSmall}">
-                        <!-- The thing this step is for, so the one lit button on the page -->
-                        <Button x:Name="RenderButton" HorizontalAlignment="Stretch" MinHeight="44" Content="Render master video" Style="{ThemeResource AccentButtonStyle}" Command="{x:Bind ViewModel.RenderCommand}"
-                                ToolTipService.ToolTip="Build the finished video file with voice, pictures and captions, plus a chapter list, subtitles, a thumbnail and an upload description. A full episode can take several minutes the first time; clips that have not changed since the last render are not drawn again." />
-                        <Button x:Name="ShowFilesButton" HorizontalAlignment="Stretch" MinHeight="44" Content="Show the finished files" Command="{x:Bind ViewModel.ShowExportCommand}" Visibility="{x:Bind ViewModel.HasExport, Mode=OneWay}"
-                                ToolTipService.ToolTip="Open the folder holding the finished video and everything made to upload with it." />
-                    </StackPanel>
+                    <!-- The thing this step is for, so the one lit button on the page; the finished files are under … in the bar -->
+                    <Button x:Name="RenderButton" Grid.Row="1" HorizontalAlignment="Stretch" MinHeight="44" Content="Render master video" Style="{ThemeResource AccentButtonStyle}" Command="{x:Bind ViewModel.RenderCommand}"
+                            ToolTipService.ToolTip="Build the finished video file with voice, pictures and captions, plus a chapter list, subtitles, a thumbnail and an upload description. A full episode can take several minutes the first time; clips that have not changed since the last render are not drawn again. The finished files are then under … in the bar at the top." />
                 </Grid>
             </Grid>
         </Grid>
 
         <!-- What the app is doing and what it has to say, floating over the foot of the page so nothing moves when a job
              starts or ends: the one long job in progress, then the outcome of the last action. -->
-        <StackPanel x:Name="Dock" Grid.Row="1" VerticalAlignment="Bottom" HorizontalAlignment="Center" Width="{StaticResource DockWidth}" Margin="16,0,16,16" Spacing="{StaticResource GapSmall}">
+        <StackPanel x:Name="Dock" Grid.Row="1" VerticalAlignment="Bottom" MaxWidth="{StaticResource DockWidth}" Margin="16,0,16,16" Spacing="{StaticResource GapSmall}">
             <!-- The one long job in progress: what it is, the exact step, how far, how long, and a way to stop it -->
             <Grid x:Name="ActivityPanel" Padding="16,12" ColumnSpacing="{StaticResource GapLarge}" CornerRadius="10" Visibility="{x:Bind ViewModel.IsWorking, Mode=OneWay}"
                   Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" BorderBrush="{ThemeResource SurfaceStrokeColorFlyoutBrush}" BorderThickness="1">
@@ -469,5 +476,10 @@
             <TextBlock Grid.Column="1" Text="{x:Bind local:App.BuildVersion}" Style="{StaticResource QuietText}" Opacity="0.6" IsHitTestVisible="False"
                        HorizontalAlignment="Right" VerticalAlignment="Center" AutomationProperties.Name="Build version" />
         </Grid>
+
+        <!-- Settings slides in from the right over everything, and goes again on a click outside it or Escape. Empty and
+             see-through while shut, so the page under it works as normal. -->
+        <SplitView x:Name="SidePanel" Grid.RowSpan="3" DisplayMode="Overlay" PanePlacement="Right" OpenPaneLength="400" PaneClosed="OnSidePanelClosed" Visibility="Collapsed" />
     </Grid>
+    </UserControl>
 </winex:WindowEx>

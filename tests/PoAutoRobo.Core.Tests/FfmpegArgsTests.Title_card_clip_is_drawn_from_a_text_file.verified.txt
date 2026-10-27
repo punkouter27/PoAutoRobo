@@ -1,9 +1,9 @@
 ﻿-f
 lavfi
 -i
-color=c=0x101828:s=1920x1080:r=30
+gradients=s=1920x1080:r=30:n=3:c0=0x101828:c1=0xFFD400:c2=0x101828:x0=0:y0=0:x1=1920:y1=1080:speed=0.004
 -vf
-drawtext=textfile=title_02.txt:expansion=none:fontfile=title-font.ttf:fontcolor=white:fontsize=h/12:x=(w-text_w)/2:y=(h-text_h)/2,fade=t=in:st=0:d=0.250,fade=t=out:st=14.750:d=0.250,format=yuv420p
+drawtext=textfile=title_02.txt:expansion=none:fontfile=title-font.ttf:fontcolor=white:fontsize=h/12:x=(w-text_w)/2:y=(h-text_h)/2:borderw=3:bordercolor=black@0.35,fade=t=in:st=0:d=0.250,fade=t=out:st=14.750:d=0.250,format=yuv420p
 -t
 15.000
 -an

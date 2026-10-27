@@ -39,7 +39,7 @@ public static partial class FfmpegArgs
     /// </summary>
     public static IReadOnlyList<string> IntroMask(BookendLook look, string channelFile, string? taglineFile, string titleFile, ExportPreset size, string output)
     {
-        var card = Card(look, IntroMaskLength, size, output, IntroWords(look, channelFile, taglineFile, titleFile), black: true).ToList();
+        var card = Card(look with { Grain = false }, IntroMaskLength, size, output, IntroWords(look, channelFile, taglineFile, titleFile), black: true).ToList();
         var end = card.IndexOf("-map") + 2; // the inputs, the drawing and its output; the encoding is replaced
         return [.. card.Take(end), "-ss", "2.5", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-y", output];
     }
@@ -73,13 +73,13 @@ public static partial class FfmpegArgs
         string[] graph =
         [
             $"[1:v]format=yuva420p,fade=t=in:st={Seconds(Synth.Hit)}:d=0.6:alpha=1[card]",
-            $"[0:v]fade=t=in:st={Seconds(Synth.Hit - TimeSpan.FromSeconds(1))}:d=1[ground]",
+            $"[0:v]fade=t=in:st={Seconds(Synth.Hit - TimeSpan.FromSeconds(1))}:d=1{(look.Grain ? FilmGrain : "")}[ground]", // the card brings its own finish
             "[ground][card]overlay=shortest=1,format=gbrp[base]",
             $"[2:v]scale={w}:{h}:flags=bicubic,format=gbrp,split[dots][halo]",
             $"[halo]gblur=sigma={Math.Max(2, h / 120)}[glow]",
             "[dots][glow]blend=all_mode=addition:all_opacity=0.7[light]",
             // Screened, not added: light over the bright background brightens it without burning it out to white.
-            $"[base][light]blend=all_mode=screen:shortest=1,format=yuv420p,noise=alls=5:allf=t{Finish(length, null)}[v]",
+            $"[base][light]blend=all_mode=screen:shortest=1,format=yuv420p,noise=alls=5:allf=t{Finish(length, null, preset)}[v]",
         ];
         return
         [
@@ -131,7 +131,7 @@ public static partial class FfmpegArgs
             graph.Add($"{picture}[logo]overlay=x={(mascotLeft ? "W-w-W*0.04" : "W*0.04")}:y=H*0.06[l]"); // in the corner away from the mascot
             picture = "[l]";
         }
-        graph.Add($"{picture}{string.Join(',', words)}{Finish(length, null)}[v]");
+        graph.Add($"{picture}{string.Join(',', words)}{Finish(length, null, preset, new Polish(Grain: look.Grain))}[v]");
         return [.. inputs, "-filter_complex", string.Join(';', graph), "-map", "[v]", "-t", Seconds(length), "-an", .. Encode(preset), "-y", output];
     }
 

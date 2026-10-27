@@ -6,15 +6,15 @@ namespace PoAutoRobo.Core.Library;
 /// <param name="Footage">The owner's own clips of the robot, each placed in one clip of the episode.</param>
 public sealed record Lesson(string Taught, string WentWrong, BeatStructure Structure, IReadOnlyList<FootageNote> Footage)
 {
-    /// <summary>A lesson told as a story, with nothing gone wrong and no footage.</summary>
-    public static Lesson Of(string taught) => new(taught, "", BeatStructure.Story, []);
-
     /// <summary>The lesson as one piece of text: what is saved as the episode's topic and what the model reads.</summary>
     public string Topic => WentWrong.Trim().Length > 0 ? $"{Taught.Trim()}\n\nWhat went wrong: {WentWrong.Trim()}" : Taught.Trim();
 
     /// <summary>The series so far, a line to each episode ("#3 · Standing up: …"), so this one can build on them.</summary>
     public IReadOnlyList<string> Earlier { get; init; } = [];
 }
+
+/// <summary>One shot to film for a beat, from the list asked for before filming; ticked once it is filmed.</summary>
+public sealed record Shot(string Beat, string What, bool Done = false);
 
 /// <param name="Path">The file as the owner picked it. It is copied into the episode once the script is written.</param>
 /// <param name="Note">A line on what it shows, which tells the script where it belongs.</param>

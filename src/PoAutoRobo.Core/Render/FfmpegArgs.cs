@@ -25,7 +25,17 @@ public sealed record TeaserCut(string Picture, string Sound, TimeSpan Start, Tim
 /// How the series intro and outro look: the accent colour (#RRGGBB), the kit's logo and mascot pictures (each null when
 /// there is none), and where the intro's words and mascot sit.
 /// </summary>
-public sealed record BookendLook(string Accent, string? Logo, string? Mascot, IntroLayout Layout = IntroLayout.Side);
+/// <param name="Grain">The brand kit's film finish: grain and a soft vignette, as on every clip.</param>
+public sealed record BookendLook(string Accent, string? Logo, string? Mascot, IntroLayout Layout = IntroLayout.Side, bool Grain = false);
+
+/// <summary>
+/// What a clip gets besides its picture: the series colour (for a title card's moving background and the light that
+/// sweeps in a new beat), the brand kit's film finish, and for the first clip of a beat its streak of light and the
+/// frosted glass behind its strap.
+/// </summary>
+/// <param name="NewBeat">The clip opens a beat, so a streak of light crosses its first half second.</param>
+/// <param name="Strap">The beat's name on the strap burned in with the captions, which sizes the glass behind it; null for none.</param>
+public sealed record Polish(string Accent = "#FFD400", bool Grain = false, bool NewBeat = false, string? Strap = null);
 
 /// <summary>
 /// The owner's film as the robot's own camera might see it: brightness read as depth in false colour, edges traced in
@@ -78,14 +88,17 @@ public static partial class FfmpegArgs
     /// <param name="captionsFile">Caption file timed from the start of this clip, read from the working folder; null for none.</param>
     /// <param name="move">Which camera move a still picture gets; see <see cref="PanZoom"/>.</param>
     /// <param name="eye">For footage, the robot's-eye look; null to show it as filmed.</param>
+    /// <param name="polish">The series colour, finish and beat touches; the standard ones when null.</param>
     public static IReadOnlyList<string> ClipVideo(ClipSource source, string input, TimeSpan length, ExportPreset preset, string output, string? captionsFile = null, int move = 0,
-        RobotEye? eye = null)
+        RobotEye? eye = null, Polish? polish = null)
     {
         var (w, h, fps) = preset;
         var frames = (int)Math.Round(length.TotalSeconds * fps);
+        polish ??= new Polish();
         string[] inputArgs = source switch
         {
-            ClipSource.TitleCard => ["-f", "lavfi", "-i", $"color=c=0x101828:s={w}x{h}:r={fps}"],
+            // A band of the series colour turning slowly through the dark, so a chapter break is never a flat slide.
+            ClipSource.TitleCard => ["-f", "lavfi", "-i", $"gradients=s={w}x{h}:r={fps}:n=3:c0=0x101828:c1=0x{polish.Accent.TrimStart('#')}:c2=0x101828:x0=0:y0=0:x1={w}:y1={h}:speed=0.004"],
             ClipSource.Loop => ["-stream_loop", "-1", "-i", input],
             _ => ["-i", input],
         };
@@ -96,9 +109,9 @@ public static partial class FfmpegArgs
                 $"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,fps={fps}," +
                 $"tpad=stop_mode=clone:stop_duration={Seconds(length)}" + (eye is null ? "" : RobotLook(eye)),
             // ponytail: one centred line, no wrapping. Clip titles are short; wrap here if they stop being so.
-            _ => $"drawtext=textfile={input}:expansion=none:fontfile={TitleFontFile}:fontcolor=white:fontsize={(preset.Portrait ? "w" : "h")}/12:x=(w-text_w)/2:y=(h-text_h)/2",
+            _ => $"drawtext=textfile={input}:expansion=none:fontfile={TitleFontFile}:fontcolor=white:fontsize={(preset.Portrait ? "w" : "h")}/12:x=(w-text_w)/2:y=(h-text_h)/2:borderw=3:bordercolor=black@0.35",
         };
-        return [.. inputArgs, "-vf", filter + Finish(length, captionsFile), "-t", Seconds(length), "-an", .. Encode(preset), "-y", output];
+        return [.. inputArgs, "-vf", filter + Finish(length, captionsFile, preset, polish), "-t", Seconds(length), "-an", .. Encode(preset), "-y", output];
     }
 
     // The robot's-eye look, after the film is fitted to the frame. Brightness stands in for depth: there is no depth
@@ -127,7 +140,7 @@ public static partial class FfmpegArgs
     }
 
     /// <summary>Renders a panel sequence: each picture gets an equal share of the clip, with its own pan and zoom.</summary>
-    public static IReadOnlyList<string> PanelsVideo(IReadOnlyList<string> images, TimeSpan length, ExportPreset preset, string output, string? captionsFile = null)
+    public static IReadOnlyList<string> PanelsVideo(IReadOnlyList<string> images, TimeSpan length, ExportPreset preset, string output, string? captionsFile = null, Polish? polish = null)
     {
         var (w, h, fps) = preset;
         var total = (int)Math.Round(length.TotalSeconds * fps);
@@ -137,7 +150,7 @@ public static partial class FfmpegArgs
             var frames = total / images.Count + (i < total % images.Count ? 1 : 0); // spare frames go to the first panels
             graph.Add($"[{i}:v]{PanZoom(preset, frames)}[p{i}]");
         }
-        graph.Add($"{string.Concat(images.Select((_, i) => $"[p{i}]"))}concat=n={images.Count}:v=1:a=0{Finish(length, captionsFile)}[v]");
+        graph.Add($"{string.Concat(images.Select((_, i) => $"[p{i}]"))}concat=n={images.Count}:v=1:a=0{Finish(length, captionsFile, preset, polish)}[v]");
         return
         [
             .. images.SelectMany(path => new[] { "-i", path }),
@@ -150,7 +163,8 @@ public static partial class FfmpegArgs
     /// Renders a layered picture: the background pushes in slowly while the subject, cut out on a transparent
     /// background and a little larger than the frame, slides across in front of it.
     /// </summary>
-    public static IReadOnlyList<string> ParallaxVideo(string background, string subject, TimeSpan length, ExportPreset preset, string output, string? captionsFile = null)
+    public static IReadOnlyList<string> ParallaxVideo(string background, string subject, TimeSpan length, ExportPreset preset, string output, string? captionsFile = null,
+        Polish? polish = null)
     {
         var (w, h, fps) = preset;
         var frames = (int)Math.Round(length.TotalSeconds * fps);
@@ -158,7 +172,7 @@ public static partial class FfmpegArgs
         var graph =
             $"[0:v]{PanZoom(preset, frames)}[bg];" +
             $"[1:v]format=rgba,scale={fw}:{fh}:force_original_aspect_ratio=increase,crop={fw}:{fh}[fg];" +
-            $"[bg][fg]overlay=x='-(w-W)*t/{Seconds(length)}':y='-(h-H)/2'{Finish(length, captionsFile)}[v]";
+            $"[bg][fg]overlay=x='-(w-W)*t/{Seconds(length)}':y='-(h-H)/2'{Finish(length, captionsFile, preset, polish)}[v]";
         return
         [
             "-i", background, "-i", subject,
@@ -244,10 +258,52 @@ public static partial class FfmpegArgs
     public static string HookLines(string hook) =>
         string.Join('\n', Durations.SplitWords(hook).Chunk(4).Select(line => string.Join(' ', line)));
 
-    /// <summary>The last filters on every clip: captions over the picture, then the fades over both.</summary>
-    private static string Finish(TimeSpan length, string? captionsFile) =>
+    /// <summary>
+    /// The last filters on every clip: the strap's glass and the captions over the picture, the film finish, then the
+    /// fades over all of them, and a new beat's streak of light, which crosses even the dip to black.
+    /// </summary>
+    private static string Finish(TimeSpan length, string? captionsFile, ExportPreset preset, Polish? polish = null) =>
+        (polish?.Strap is { Length: > 0 } strap ? Glass(preset, strap) : "") +
         (captionsFile is null ? "" : $",ass={captionsFile}") +
-        $",fade=t=in:st=0:d={Seconds(Fade)},fade=t=out:st={Seconds(length - Fade)}:d={Seconds(Fade)},format=yuv420p";
+        (polish?.Grain == true ? FilmGrain : "") +
+        $",fade=t=in:st=0:d={Seconds(Fade)},fade=t=out:st={Seconds(length - Fade)}:d={Seconds(Fade)}" +
+        (polish?.NewBeat == true ? LightTrail(preset, polish.Accent) : "") +
+        ",format=yuv420p";
+
+    /// <summary>The brand kit's film finish: fine grain that moves from frame to frame, and corners a little darker.</summary>
+    private const string FilmGrain = ",noise=alls=7:allf=t,vignette=PI/5";
+
+    /// <summary>How long a new beat's streak of light takes to cross the frame.</summary>
+    public static readonly TimeSpan TrailLength = TimeSpan.FromSeconds(0.5);
+
+    // A streak of light in the series colour, white-hot near its soft head and fading along its tail, crossing the frame as a
+    // new beat opens. Clips are joined by copying, so it is burned into the beat's first clip instead of a crossfade.
+    private static string LightTrail(ExportPreset preset, string accent)
+    {
+        var (w, h, fps) = preset;
+        var colour = Convert.FromHexString(accent.TrimStart('#'));
+        var (tw, th) = (w * 3 / 5 / 2 * 2, Math.Max(8, h / 8 / 2 * 2));
+        string Hot(byte value) => $"{value}+{255 - value}*pow(X/W,8)";
+        return $"[unlit];color=c=black:s={tw}x{th}:r={fps}:d={Seconds(TrailLength)},format=rgba," +
+            $"geq=r='{Hot(colour[0])}':g='{Hot(colour[1])}':b='{Hot(colour[2])}':a='255*pow(X/W,3)*(1-pow(X/W,40))*exp(-pow(6*Y/H-3,2))'[streak];" +
+            $"[unlit][streak]overlay=x='-w+(W+w)*t/{Seconds(TrailLength)}':y=H*0.42-h/2:eof_action=pass";
+    }
+
+    // The strap's frosted pane: the picture behind it blurred, lifted and soft at its edges, coming and going with the
+    // strap. Placed from the strap's style in AssCaptions (top left, 80 in at 1920 wide) and a rough width per letter,
+    // so it runs a little past the strap's own box whatever the font.
+    private static string Glass(ExportPreset preset, string strap)
+    {
+        var (playWidth, size) = preset.Portrait ? (1080, 52) : (1920, 44);
+        var scale = (double)preset.Width / playWidth;
+        int Px(double value) => Math.Max(2, (int)Math.Round(value * scale / 2) * 2);
+        var (x, y) = (Px(54), Px(54)); // a little outside the strap's box, which starts 66 in
+        var (w, h) = (Math.Min(Px(strap.Length * (0.55 * size + 2) + 52), preset.Width - x), Px(1.3 * size + 52));
+        var end = AssCaptions.StrapLength;
+        return $",split[clear][frost];[frost]trim=end={Seconds(end)},crop={w}:{h}:{x}:{y},gblur=sigma={Px(16)},drawbox=color=white@0.18:t=fill,format=yuva444p," +
+            $"geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='255*clip(min(min(X,W-1-X),min(Y,H-1-Y))/{Px(12)},0,1)'," +
+            $"fade=t=in:d=0.2:alpha=1,fade=t=out:st={Seconds(end - TimeSpan.FromSeconds(0.3))}:d=0.3:alpha=1[pane];[clear][pane]overlay={x}:{y}:eof_action=pass";
+    }
 
     // Identical for every clip: the join copies the pictures, which only works when they are encoded the same way.
     // ponytail: software x264 only. A native (not emulated) FFmpeg build is the bigger win on ARM machines.

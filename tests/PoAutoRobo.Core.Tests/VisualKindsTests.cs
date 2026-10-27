@@ -348,6 +348,12 @@ public sealed class VisualKindsTests : IDisposable
         // Code that never finishes is stopped, not left to hang the job until the user gives up.
         var endless = new Scene("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "function render(t) { while (true) {} }");
         await Assert.ThrowsAsync<SceneCodeException>(() => renderer.RenderAsync(endless, request.Length, output, Ct));
+        // Nor is a page frozen between frames, by a loop queued to run later, which no frame's limit reaches.
+        var frozen = new Scene("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "function render(t) { if (t > 0) setTimeout(() => { for (;;) {} }, 0); }");
+        await Assert.ThrowsAsync<SceneCodeException>(() => renderer.RenderAsync(frozen, request.Length, output, Ct));
+        // A page that sends itself to a file on this computer is stopped before that file can be pictured in the video.
+        var away = new Scene("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "function render(t) { if (t > 0 && t < 0.5) location.href = 'file:///C:/Windows/win.ini'; }");
+        await Assert.ThrowsAsync<SceneCodeException>(() => renderer.RenderAsync(away, request.Length, output, Ct));
     }
 
     [Fact]

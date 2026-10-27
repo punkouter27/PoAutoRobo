@@ -37,6 +37,22 @@ internal static class TestExtensions
         });
         return narrator;
     }
+
+    extension(Lesson)
+    {
+        /// <summary>A lesson told as a story, with nothing gone wrong and no footage.</summary>
+        public static Lesson Of(string taught) => new(taught, "", BeatStructure.Story, []);
+    }
+}
+
+/// <summary>Runs only where FFmpeg is installed; skipped elsewhere.</summary>
+public sealed class FfmpegFactAttribute : FactAttribute
+{
+    public FfmpegFactAttribute()
+    {
+        if (FfmpegRunner.Locate() is null)
+            Skip = "FFmpeg is not installed.";
+    }
 }
 
 /// <summary>Stands in for the signed-in Azure user, so no test ever asks the real sign-in for a token.</summary>

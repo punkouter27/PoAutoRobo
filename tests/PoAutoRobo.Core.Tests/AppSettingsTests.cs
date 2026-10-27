@@ -24,11 +24,12 @@ public sealed class AppSettingsTests
     }
 
     [Fact]
-    public async Task Settings_come_from_the_vault_and_say_whether_the_services_are_live_or_simulated_and_why()
+    public async Task Settings_come_from_the_vault_say_whether_the_services_are_live_and_never_print_their_secrets()
     {
         await Vault_secrets_map_onto_settings_and_with_an_endpoint_the_services_are_live();
         await Without_a_usable_endpoint_the_services_are_simulated_and_an_unreachable_vault_also_keeps_the_reason();
         await The_switches_in_settings_choose_the_optional_services_and_their_variables_still_win();
+        await Secret_values_never_appear_when_settings_are_printed_or_logged();
     }
 
     private async Task Vault_secrets_map_onto_settings_and_with_an_endpoint_the_services_are_live()
@@ -43,7 +44,7 @@ public sealed class AppSettingsTests
         Assert.True(settings.IsLive);
         // Requests are signed as the user, so the resource's key is never fetched or held.
         Assert.Equal("pexels-secret-value", settings.PexelsKey);
-        Assert.Equal(["AzureOpenAI--Endpoint", "GitHub--PAT", "Pexels--ApiKey"], vault.Asked.Order());
+        Assert.Equal(["AzureOpenAI--Endpoint", "GitHub--PAT", "Pexels--ApiKey", "YouTube--ClientId", "YouTube--ClientSecret"], vault.Asked.Order());
 
         // What script and voice cost is the user's to give; until then nothing is priced, and nonsense is no rate at all.
         Assert.Null(settings.ChatRates);
@@ -93,8 +94,7 @@ public sealed class AppSettingsTests
         Assert.Null(off.PexelsKey);
     }
 
-    [Fact]
-    public async Task Secret_values_never_appear_when_settings_are_printed_or_logged()
+    private async Task Secret_values_never_appear_when_settings_are_printed_or_logged()
     {
         var text = (await AppSettings.LoadAsync(new FakeVault(FullVault).GetAsync, Ct)).ToString();
 

@@ -50,7 +50,7 @@
             <x:Double x:Key="LibraryItemHeight">64</x:Double>
             <!-- A teaser's card on the Publish step: three side by side fill the room beside the column in a full window. -->
             <x:Double x:Key="TeaserCardWidth">300</x:Double>
-            <!-- The floating bar that shows a job under way and the last message, over the foot of every page. -->
+            <!-- The floating bar that shows a job under way and the last message, over the foot of every page: at most this wide, narrower with the window. -->
             <x:Double x:Key="DockWidth">720</x:Double>
 
             <!-- The app's few shared looks, named once so every view uses the same ones. -->
@@ -70,11 +70,6 @@
                 <Setter Property="Padding" Value="6,2" />
                 <Setter Property="CornerRadius" Value="4" />
                 <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
-            </Style>
-            <!-- A mark on a clip's picture for something worth a second look. Each kind of thing has its own colour and sign. -->
-            <Style x:Key="Mark" TargetType="Border">
-                <Setter Property="Padding" Value="5,3" />
-                <Setter Property="CornerRadius" Value="4" />
             </Style>
             <!-- The heading over a group of controls. -->
             <Style x:Key="SectionHeading" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
@@ -96,21 +91,6 @@
                 <Setter Property="HorizontalAlignment" Value="Right" />
                 <Setter Property="VerticalAlignment" Value="Bottom" />
             </Style>
-
-
-            <!--
-              What a placeholder is filled with while its content loads: a soft band of light that crosses the whole
-              window, so every placeholder catches it in turn. One brush, moved by the window, shared by them all.
-              Mid grey at low strength, which reads as lighter than a dark page and darker than a light one.
-            -->
-            <LinearGradientBrush x:Key="ShimmerBrush" MappingMode="Absolute" StartPoint="0,0" EndPoint="600,0" SpreadMethod="Repeat">
-                <LinearGradientBrush.Transform>
-                    <TranslateTransform />
-                </LinearGradientBrush.Transform>
-                <GradientStop Offset="0" Color="#22808080" />
-                <GradientStop Offset="0.5" Color="#66808080" />
-                <GradientStop Offset="1" Color="#22808080" />
-            </LinearGradientBrush>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

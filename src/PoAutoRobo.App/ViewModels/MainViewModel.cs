@@ -54,7 +54,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>True once the app knows whether it is running on the live services or on stand-ins.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Notice), nameof(NoticeDetail), nameof(PicturesAvailable), nameof(HostCandidatesCost), nameof(LogoCandidatesCost))]
-    [NotifyCanExecuteChangedFor(nameof(CreateEpisodeCommand), nameof(GenerateAllCommand), nameof(GeneratePictureCommand), nameof(AnotherTakeCommand), nameof(MakeDraftCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateEpisodeCommand), nameof(SuggestShotsCommand), nameof(GenerateAllCommand), nameof(GeneratePictureCommand), nameof(AnotherTakeCommand), nameof(MakeDraftCommand))]
     public partial bool IsConnected { get; set; }
 
     /// <summary>Which services are simulated and why; null when everything is live.</summary>
@@ -64,10 +64,16 @@ public partial class MainViewModel : ObservableObject
 
     /// <param name="visualsFor">Makes the picture service for an episode folder and a quality; null when pictures are not available.</param>
     /// <param name="hear">Listens to what is said in a film; null when that is not set up.</param>
-    public void Connect(IScriptWriter writer, EpisodeBuilder builder, Grounding grounding, Func<string, Quality, Visuals>? visualsFor, string imageModel, string? offlineMessage, Hear? hear = null)
+    /// <param name="youTube">Uploads to YouTube; null when the app's Google sign-in is not set up.</param>
+    public void Connect(IScriptWriter writer, EpisodeBuilder builder, Grounding grounding, Func<string, Quality, Visuals>? visualsFor, string imageModel, string? offlineMessage, Hear? hear = null,
+        YouTube? youTube = null)
     {
-        (_scriptWriter, _builder, _grounding, _visualsFor, _imageModel, OfflineMessage, _hear) = (writer, builder, grounding, visualsFor, imageModel, offlineMessage, hear);
+        (_scriptWriter, _builder, _grounding, _visualsFor, _imageModel, OfflineMessage, _hear, _youTube) = (writer, builder, grounding, visualsFor, imageModel, offlineMessage, hear, youTube);
         IsConnected = true;
+        OnPropertyChanged(nameof(UploadTip));
+        OnPropertyChanged(nameof(YouTubeReady));
+        UploadCommand.NotifyCanExecuteChanged();
+        UploadShortsCommand.NotifyCanExecuteChanged();
         Reopen();
         RedrawStill(); // opening on the intro: show it as it stands
     }
@@ -183,6 +189,7 @@ public partial class MainViewModel : ObservableObject
         if (value) return;
         // As when the app starts with them hidden: nothing out of sight may change what is made.
         ExportPresetIndex = 0;
+        ScheduleDate = null;
         foreach (var card in TeaserCards)
             card.Reset();
     }
@@ -208,7 +215,7 @@ public partial class MainViewModel : ObservableObject
     // ---- Episode ----
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CreateEpisodeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateEpisodeCommand), nameof(SuggestShotsCommand))]
     [NotifyPropertyChangedFor(nameof(TopicCount))]
     public partial string TopicInput { get; set; } = "";
 
@@ -241,7 +248,7 @@ public partial class MainViewModel : ObservableObject
         nameof(CaptionPresetIndex), nameof(CaptionFontSize), nameof(CaptionStroke), nameof(CaptionsTuned), nameof(CaptionAccent), nameof(HasMusic), nameof(MusicLabel), nameof(EpisodeOffSeriesLook))]
     [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(UseSeriesLookCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(NarrateAllCommand),
         nameof(CleanMediaCommand), nameof(RenameEpisodeCommand), nameof(MakeDraftCommand), nameof(RemoveMusicCommand),
-        nameof(WatchClipCommand), nameof(WatchTeaserCommand))]
+        nameof(WatchClipCommand), nameof(WatchTeaserCommand), nameof(MakeThumbnailsCommand), nameof(UploadShortsCommand))]
     public partial Episode? Episode { get; set; }
 
     [ObservableProperty]
@@ -303,7 +310,7 @@ public partial class MainViewModel : ObservableObject
     {
         lock (_usedBeforeFolder)
         {
-            if (EpisodeFolder is { } folder && !IsCreating)
+            if (EpisodeFolder is { } folder && !IsCreating && !_planningShots)
                 SpendLog.Add(folder, what, dollars, units);
             else
                 _usedBeforeFolder.Add((what, units, dollars));

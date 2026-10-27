@@ -40,14 +40,17 @@ public partial class MainViewModel
     private string? OverBudget(decimal more)
     {
         if (MonthlyBudget <= 0) return null;
-        var spent = SpendLog.MonthTotal(AppPaths.Episodes, DateTimeOffset.Now);
+        var spent = MonthSpent();
         return spent + more > (decimal)MonthlyBudget
             ? $"That would pass this month's budget of {SpendLog.Money((decimal)MonthlyBudget)}: {SpendLog.Money(spent)} is spent already. Raise the budget in Settings to go on."
             : null;
     }
 
     /// <summary>What every episode has spent this calendar month, and the budget it is held to (0 for none).</summary>
-    public (decimal Spent, decimal Budget) MonthSpend() => (SpendLog.MonthTotal(AppPaths.Episodes, DateTimeOffset.Now), (decimal)MonthlyBudget);
+    public (decimal Spent, decimal Budget) MonthSpend() => (MonthSpent(), (decimal)MonthlyBudget);
+
+    // Every episode's spending this month, and what was spent with none open (the host, the logo), which is kept apart.
+    private static decimal MonthSpent() => SpendLog.MonthTotal(AppPaths.Episodes, DateTimeOffset.Now, AppPaths.Host);
 
     /// <summary>This episode's spending by kind, then the month's total across every episode; for the Settings panel.</summary>
     [ObservableProperty]
@@ -60,7 +63,7 @@ public partial class MainViewModel
             ? SpendLog.Breakdown(folder).Select(line => string.Join(" · ", new[] { line.What, line.Units > 0 ? $"{line.Units:N0}" : "", line.Dollars > 0 ? SpendLog.Money(line.Dollars) : "" }.Where(part => part.Length > 0))).ToList()
             : [];
         if (lines.Count == 0) lines.Add(EpisodeFolder is null ? "No episode is open." : "Nothing spent on this episode yet.");
-        lines.Add($"This month, every episode: {SpendLog.Money(SpendLog.MonthTotal(AppPaths.Episodes, DateTimeOffset.Now))}");
+        lines.Add($"This month, every episode: {SpendLog.Money(MonthSpent())}");
         SpendDetail = string.Join('\n', lines);
     }
 
@@ -266,13 +269,23 @@ public partial class MainViewModel
         }
     }
 
+    /// <summary>Draws three designs for the host, after saying what they cost and checking the month's budget.</summary>
     [RelayCommand(IncludeCancelCommand = true)]
-    private Task MakeHostCandidatesAsync(CancellationToken ct)
+    private async Task MakeHostCandidatesAsync(CancellationToken ct)
     {
         ErrorMessage = null;
-        return Guard(async () =>
+        if (CurrentVisuals is not { } visuals) return;
+        var dollars = 3 * (CostEstimate.PriceOf(_imageModel, Quality) ?? 0);
+        if (OverBudget(dollars) is { } refusal)
         {
-            var candidates = await CurrentVisuals!.CandidateSheetsAsync(3, ct);
+            ErrorMessage = refusal;
+            return;
+        }
+        if (!await ConfirmSpend("Make 3 host designs?", "Draws three designs for the host, the character who appears in every episode. You lock one, or none. Asking again with nothing changed shows the same three, free.", "Make them", dollars))
+            return;
+        await Guard(async () =>
+        {
+            var candidates = await visuals.CandidateSheetsAsync(3, ct);
             HostCandidates.Clear();
             foreach (var path in candidates)
                 HostCandidates.Add(path);

@@ -23,3 +23,14 @@ public sealed partial class FootageRow(string path, TimeSpan length) : Observabl
 
     public FootageNote ToNote() => new(Path, Note.Trim(), OwnSound, Length);
 }
+
+/// <summary>One shot to film on the lesson page, ticked off once it is filmed.</summary>
+public sealed partial class ShotRow(Shot shot) : ObservableObject
+{
+    public string Text { get; } = $"{shot.Beat} · {shot.What}";
+
+    [ObservableProperty]
+    public partial bool Done { get; set; } = shot.Done;
+
+    public Shot ToShot() => shot with { Done = Done };
+}

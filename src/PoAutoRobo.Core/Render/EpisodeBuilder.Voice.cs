@@ -51,6 +51,9 @@ public sealed partial class EpisodeBuilder
         }
     }
 
+    // ponytail: a gate is kept for every line spoken while the app runs, a few hundred small objects in a long day.
+    // Taking one out once free would race a caller that has just been handed it; a count of waiters taken under a
+    // lock would let each go when its last caller leaves, if a session ever grows that large.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _narrationGates = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

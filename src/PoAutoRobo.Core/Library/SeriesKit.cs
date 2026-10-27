@@ -46,6 +46,9 @@ public sealed record SeriesKit
     /// <summary>How the intro is laid out. The outro keeps one layout, as YouTube's end-screen cards need its right half.</summary>
     public IntroLayout Layout { get; init; }
 
+    /// <summary>A film finish (fine moving grain and darker corners) over every clip, the intro and the outro alike. Off unless chosen.</summary>
+    public bool Grain { get; init; }
+
     public TimeSpan Outro => TimeSpan.FromSeconds(OutroSeconds);
 
     /// <summary>

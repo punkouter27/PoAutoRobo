@@ -26,14 +26,7 @@ public enum DeclinedBy
 public sealed partial class ScriptDeclinedException(DeclinedBy by, string? flagged, string model)
     : InvalidOperationException(InWords(by, flagged, model) + " Reword the topic and try again.")
 {
-    public DeclinedBy By { get; } = by;
-
     public string? Flagged { get; } = flagged;
-
-    public string Model { get; } = model;
-
-    /// <summary>What happened in one sentence, without the advice.</summary>
-    public string What { get; } = InWords(by, flagged, model);
 
     private static string InWords(DeclinedBy by, string? flagged, string model)
     {

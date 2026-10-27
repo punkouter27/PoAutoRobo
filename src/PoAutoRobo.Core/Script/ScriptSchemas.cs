@@ -327,6 +327,24 @@ internal static class ScriptSchemas
         { "type": "object", "properties": { "teasers": { "type": "array", "items": { "type": "object", "properties": { "hook": { "type": "string" }, "moments": { "type": "array", "items": { "type": "object", "properties": { "clip": { "type": "integer" }, "start": { "type": "number" }, "length": { "type": "number" } }, "required": ["clip", "start", "length"], "additionalProperties": false } } }, "required": ["hook", "moments"], "additionalProperties": false } } }, "required": ["teasers"], "additionalProperties": false }
         """;
 
+    /// <summary>Plans what to film for a lesson, before it is filmed.</summary>
+    public const string ShotsSystem = $"""
+        You help the owner of a Unitree R1 EDU humanoid robot plan what to film for one episode of their series about
+        teaching it a new skill, before they film it. For each beat the request names, give two to four shots, in the
+        order they would be filmed:
+        - beat: the beat's name, exactly as the request gives it.
+        - shot: one short plain line saying where to point the camera and what should happen, for example "From the
+          side, low down: its foot lifting onto the first step". Each is one take on a phone, a few seconds to a minute.
+        Film the real robot and the place it works in. Where the lesson says something went wrong, plan a shot of that
+        moment. Use only what the lesson says.
+
+        {Fence}
+        """;
+
+    public const string Shots = """
+        { "type": "object", "properties": { "shots": { "type": "array", "items": { "type": "object", "properties": { "beat": { "type": "string" }, "shot": { "type": "string" } }, "required": ["beat", "shot"], "additionalProperties": false } } }, "required": ["shots"], "additionalProperties": false }
+        """;
+
     public const string PublishSystem = $"""
         You write the upload details for an educational video from its script. Give:
         - titles: three alternative video titles, each under 70 characters.

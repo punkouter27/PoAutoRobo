@@ -66,6 +66,18 @@ public sealed class ClipEditingTests
         var steps = 0;
         for (var now = "g"; history.TryUndo(now, out now);) steps++;
         Assert.Equal(3, steps);
+
+        // A slider tick after a pause is a step of its own, not more of a drag that ended a while ago.
+        var clock = DateTimeOffset.UnixEpoch;
+        var timed = new EditHistory<string>(clock: () => clock);
+        timed.Record("a", merges: true);
+        clock += TimeSpan.FromMilliseconds(100);
+        timed.Record("b", merges: true);
+        clock += TimeSpan.FromMinutes(2);
+        timed.Record("c", merges: true);
+        Assert.True(timed.TryUndo("d", out var afterPause));
+        Assert.True(timed.TryUndo(afterPause, out var start));
+        Assert.Equal(("c", "a"), (afterPause, start));
     }
 
     [Fact]
@@ -131,7 +143,7 @@ public sealed class ClipEditingTests
     // ---- A picture that arrives after the clip has moved on ----
 
     [Fact]
-    public async Task A_finished_picture_clears_stale_on_an_unchanged_clip_but_is_marked_out_of_date_if_the_words_changed_meanwhile()
+    public async Task A_finished_picture_is_out_of_date_if_the_words_changed_meanwhile_and_never_overrides_footage_a_new_picture_type_or_a_clip_that_is_gone()
     {
         var stale = EpisodeEditor.Update(_episode, Target.Id, c => c with { Visual = new VisualSpec(VisualKind.Still, Stale: true) });
 
@@ -147,10 +159,10 @@ public sealed class ClipEditingTests
         Assert.Equal(["old-words.png"], moved.Visual.MediaPaths);
         Assert.True(moved.Visual.Stale);
         Assert.Equal("Now something else entirely.", moved.Active.Dialogue);
+        A_picture_never_overrides_footage_a_picture_type_chosen_while_it_was_being_drawn_or_a_clip_that_is_gone();
     }
 
-    [Fact]
-    public void A_picture_never_overrides_footage_a_picture_type_chosen_while_it_was_being_drawn_or_a_clip_that_is_gone()
+    private void A_picture_never_overrides_footage_a_picture_type_chosen_while_it_was_being_drawn_or_a_clip_that_is_gone()
     {
         var withVideo = EpisodeEditor.AttachVideo(_episode, Target.Id, "lab.mp4", Fit("Fitted.", 1.05));
         var retyped = EpisodeEditor.SetKind(_episode, Target.Id, VisualKind.TitleCard);
@@ -172,6 +184,14 @@ public sealed class ClipEditingTests
         Assert.Equal(meanwhile.Clips.Select(c => c.Id), merged.Clips.Select(c => c.Id));        // the reorder survived
         Assert.Equal(Tier.C, merged.Clips.First(c => c.Id == _episode.Clips[0].Id).ActiveTier); // so did the tier change
         Assert.Equal("Edited words.", merged.Clips.First(c => c.Id == Target.Id).Active.Dialogue);
+
+        // Words checked while a picture was being drawn: the picture that arrived meanwhile is kept, and marked out of date only when the words said so.
+        var drawn = EpisodeEditor.ApplyPicture(meanwhile, Target, ["drawn.png"]);
+        var worded = EpisodeEditor.SetDialogue(drawn, Target.Id, "Edited words.", stale: true).Clips.First(c => c.Id == Target.Id);
+        Assert.Equal(["drawn.png"], worded.Visual.MediaPaths);
+        Assert.Equal((true, "Edited words."), (worded.Visual.Stale, worded.Active.Dialogue));
+        Assert.False(EpisodeEditor.SetDialogue(drawn, Target.Id, "Edited words.", stale: false).Clips.First(c => c.Id == Target.Id).Visual.Stale);
+        Assert.Same(drawn, EpisodeEditor.SetDialogue(drawn, Guid.NewGuid(), "Gone.", stale: true)); // a clip taken out meanwhile is left out
     }
 
     // ---- The user's own footage ----

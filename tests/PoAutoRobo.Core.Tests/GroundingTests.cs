@@ -31,7 +31,7 @@ public sealed class GroundingTests : IDisposable
     };
 
     [Fact]
-    public void Topics_become_keywords_without_filler_and_documents_are_split_at_headings_and_cut_to_a_readable_size()
+    public void Topics_become_keywords_documents_are_split_at_headings_and_figures_the_sources_do_not_contain_are_flagged()
     {
         Assert.Equal(["training", "balance", "r1", "edu", "isaac", "lab"], Grounding.Keywords("Training the balance of an R1 EDU using Isaac Lab"));
 
@@ -41,6 +41,7 @@ public sealed class GroundingTests : IDisposable
         Assert.StartsWith("## Training", chunks[1].Text);
         Assert.All(chunks, c => Assert.Equal("https://github.com/unitreerobotics/unitree_rl_mjlab/blob/main/README.md", c.Url));
         Assert.Equal(Grounding.MaxSnippetLength, Assert.Single(Grounding.Chunk(Doc("a/b", "# Big\n\n" + new string('x', 5000)))).Text.Length);
+        Figures_and_code_names_the_sources_do_not_contain_are_flagged_and_ones_they_do_contain_are_not();
     }
 
     [Fact]
@@ -87,8 +88,7 @@ public sealed class GroundingTests : IDisposable
         Assert.Equal("unitreerobotics/unitree_rl_mjlab", snippets[0].Repo);
     }
 
-    [Fact]
-    public void Figures_and_code_names_the_sources_do_not_contain_are_flagged_and_ones_they_do_contain_are_not()
+    private void Figures_and_code_names_the_sources_do_not_contain_are_flagged_and_ones_they_do_contain_are_not()
     {
         string[] sources = ["The policy runs at 500Hz on the robot.", "Observations include joint_pos."];
 

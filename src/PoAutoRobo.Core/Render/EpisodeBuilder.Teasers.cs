@@ -40,7 +40,7 @@ public sealed partial class EpisodeBuilder
         try
         {
             CopyTitleFont(work);
-            var pictures = await DrawClipsAsync(episode, i => narrations[i].Words, i => slots[i], ExportPreset.Hd30, null, used, work, new MediaCache(ClipCacheFolder),
+            var pictures = await DrawClipsAsync(episode, i => narrations[i].Words, i => slots[i], ExportPreset.Hd30, null, brand, used, work, new MediaCache(ClipCacheFolder),
                 (activity, fraction, clips) => progress?.Report(new RenderProgress(activity, DrawShare * fraction, clips)), ct);
             var number = episode.Number > 0 ? $"{episode.Number:00}-" : "";
             for (var t = 0; t < teasers.Count; t++)
@@ -79,7 +79,7 @@ public sealed partial class EpisodeBuilder
         try
         {
             CopyTitleFont(work);
-            var pictures = await DrawClipsAsync(episode, i => narrations[i].Words, i => slots[i], Draft, null, used, work, cache, null, ct);
+            var pictures = await DrawClipsAsync(episode, i => narrations[i].Words, i => slots[i], Draft, null, brand, used, work, cache, null, ct);
             var (args, made) = await TeaserCutAsync(teaser, narrations, place, pictures, captions, Bookends(brand), ExportPreset.UprightDraft, work, ct);
             // The command names the clip pictures and sounds, whose own names change with what is in them.
             return await cache.GetOrCreateAsync([string.Join('\n', args("teaser.mp4")), .. made], ".mp4", scratch => ffmpeg.RunAsync(args(scratch), work, teaser.Length, null, ct));

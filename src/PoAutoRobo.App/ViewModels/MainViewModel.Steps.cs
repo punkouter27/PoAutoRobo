@@ -57,6 +57,8 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ShowIntro));
             OnPropertyChanged(nameof(ShowTopic));
             OnPropertyChanged(nameof(ShowDeck));
+            OnPropertyChanged(nameof(ShowPreview));
+            OnPropertyChanged(nameof(ShowPublish));
             OnPropertyChanged(nameof(StepHint));
             if (wanted == LessonStep) _ = Guard(RefreshLibraryAsync);
             if (wanted == IntroStep) RedrawStill(); // what was drawn last may be out of date: the episode number moves on
@@ -70,6 +72,10 @@ public partial class MainViewModel
     public bool ShowTopic => Step == LessonStep && !IsCreating;
 
     public bool ShowDeck => Step == ClipsStep || IsCreating;
+
+    public bool ShowPreview => Step == PreviewStep;
+
+    public bool ShowPublish => Step == PublishStep;
 
     public string StepHint => StepHints[Math.Clamp(Step, 0, StepHints.Length - 1)];
 
@@ -140,6 +146,9 @@ public partial class MainViewModel
         // Said briefly, as the bar has little room: the full warning is in the header's line under the title.
         var off = Runtime < Durations.MinEpisode ? ", too short" : Runtime > Durations.MaxEpisode ? ", too long" : "";
         items.Add(new($"Length {Runtime:m\\:ss}{off}", off.Length == 0, Optional: true));
+        // The cards carrying a mark, counted from what they already show, so a problem scrolled out of sight is not missed.
+        var flagged = Clips.Count(c => c.Warnings.Length > 0);
+        if (flagged > 0) items.Add(new(flagged == 1 ? "1 clip to check" : $"{flagged} clips to check", false, Optional: true));
         return items;
     }
 

@@ -30,7 +30,7 @@ public sealed partial class FfmpegRunner(string ffmpegPath)
         Func<Stream, CancellationToken, Task>? feed = null)
     {
         var (exitCode, _, log) = await StartAsync(
-            ffmpegPath, ["-hide_banner", .. feed is null ? new[] { "-nostdin" } : [], "-nostats", "-progress", "pipe:1", .. args], workingDirectory,
+            ffmpegPath, ["-hide_banner", .. feed is null ? new[] { "-nostdin" } : [], "-nostats", "-progress", "pipe:1", .. FilesOnly(args)], workingDirectory,
             line =>
             {
                 if (total is { Ticks: > 0 } && progress is not null && line.StartsWith("out_time_us=", StringComparison.Ordinal)
@@ -44,7 +44,7 @@ public sealed partial class FfmpegRunner(string ffmpegPath)
     public async Task<string> ProbeAsync(IReadOnlyList<string> args, CancellationToken ct)
     {
         var ffprobe = Path.Combine(Path.GetDirectoryName(ffmpegPath)!, "ffprobe.exe");
-        var (exitCode, output, log) = await StartAsync(ffprobe, args, Environment.CurrentDirectory, null, ct);
+        var (exitCode, output, log) = await StartAsync(ffprobe, ["-protocol_whitelist", "file", .. args], Environment.CurrentDirectory, null, ct);
         return exitCode == 0 ? output : throw new FfmpegException($"The file could not be read.{Environment.NewLine}{log}");
     }
 
@@ -62,12 +62,20 @@ public sealed partial class FfmpegRunner(string ffmpegPath)
     internal async Task<double> MeasureLoudnessAsync(string path, CancellationToken ct)
     {
         var (_, _, log) = await StartAsync(
-            ffmpegPath, ["-hide_banner", "-nostdin", "-nostats", "-i", path, "-af", "ebur128", "-f", "null", "-"],
+            ffmpegPath, ["-hide_banner", "-nostdin", "-nostats", .. FilesOnly(["-i", path]), "-af", "ebur128", "-f", "null", "-"],
             Environment.CurrentDirectory, null, ct, keepLogLines: 40);
         var match = IntegratedLoudness().Matches(log).LastOrDefault()
             ?? throw new FfmpegException($"Loudness could not be measured.{Environment.NewLine}{log}");
         return double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
     }
+
+    /// <summary>
+    /// Every input may be read from a file, or from the app's own pipe, and from nowhere else. The files come from the
+    /// episode folder, which is often cloud-synced and so not trusted: a playlist named like a film would otherwise
+    /// have FFmpeg fetch whatever it lists from the network.
+    /// </summary>
+    private static IEnumerable<string> FilesOnly(IEnumerable<string> args) =>
+        args.SelectMany(arg => arg == "-i" ? ["-protocol_whitelist", "file,pipe", arg] : new[] { arg });
 
     private static async Task<(int ExitCode, string Output, string Log)> StartAsync(
         string exe, IReadOnlyList<string> args, string workingDirectory, Action<string>? onOutputLine, CancellationToken ct, int keepLogLines = LogLinesKept,

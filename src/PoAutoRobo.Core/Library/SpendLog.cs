@@ -49,22 +49,42 @@ public static class SpendLog
             .Select(group => new SpendLine(group.Key, group.Sum(entry => entry.Dollars), group.Sum(entry => entry.Units)))
             .OrderByDescending(line => line.Dollars).ThenBy(line => line.What, StringComparer.Ordinal)];
 
-    /// <summary>What every episode under <paramref name="root"/> has cost in the calendar month <paramref name="now"/> falls in.</summary>
-    public static decimal MonthTotal(string root, DateTimeOffset now) =>
-        !Directory.Exists(root) ? 0 : Directory.GetDirectories(root).SelectMany(Entries)
+    /// <summary>
+    /// What every episode under <paramref name="root"/>, and the log in <paramref name="apart"/> (spending with no episode
+    /// open, such as the host and the logo), has cost in the calendar month <paramref name="now"/> falls in.
+    /// </summary>
+    // ponytail: an episode deleted this month takes its spending with it, so the budget can be passed by that much;
+    // a ledger of its own under the app's folder, added to on every Add, would keep it.
+    public static decimal MonthTotal(string root, DateTimeOffset now, string? apart = null) =>
+        (Directory.Exists(root) ? Directory.GetDirectories(root) : []).Append(apart).OfType<string>().SelectMany(Entries)
             .Where(entry => entry.When.Year == now.Year && entry.When.Month == now.Month)
             .Sum(entry => entry.Dollars);
 
+    // One damaged line (a sync conflict, a half-written entry) is skipped, not allowed to make the whole log read as
+    // nothing spent; and a negative amount, which nothing here writes, cannot lower what the budget sees.
     private static List<Entry> Entries(string folder)
     {
         try
         {
             lock (Gate)
-                return [.. File.ReadLines(Path.Combine(folder, FileName)).Where(line => line.Length > 0).Select(line => JsonSerializer.Deserialize<Entry>(line)).OfType<Entry>()];
+                return [.. File.ReadLines(Path.Combine(folder, FileName)).Where(line => line.Length > 0).Select(Parse).OfType<Entry>()
+                    .Select(entry => entry.Dollars < 0 ? entry with { Dollars = 0 } : entry)];
         }
-        catch (Exception e) when (e is IOException or JsonException)
+        catch (IOException)
         {
             return [];
+        }
+    }
+
+    private static Entry? Parse(string line)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Entry>(line);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
