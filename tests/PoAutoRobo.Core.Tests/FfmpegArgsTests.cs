@@ -260,14 +260,19 @@ public sealed class FfmpegArgsTests : IDisposable
     [Fact]
     public void Ffmpeg_is_only_taken_from_absolute_folders_on_the_path()
     {
-        var real = Path.Combine(_folder, "bin");
+        // Under the current folder, so the relative path stays relative even when temp is on another drive (as on CI).
+        var relative = "ffmpeg-" + Guid.NewGuid().ToString("N");
+        var real = Path.GetFullPath(relative);
         Directory.CreateDirectory(real);
-        File.WriteAllText(Path.Combine(real, "ffmpeg.exe"), "");
-        var relative = Path.GetRelativePath(Environment.CurrentDirectory, real);
+        try
+        {
+            File.WriteAllText(Path.Combine(real, "ffmpeg.exe"), "");
 
-        Assert.Null(FfmpegRunner.LocateIn(relative));                                   // a relative entry could be anyone's folder
-        Assert.Null(FfmpegRunner.LocateIn("." + Path.PathSeparator + ""));
-        Assert.Equal(Path.Combine(real, "ffmpeg.exe"), FfmpegRunner.LocateIn(relative + Path.PathSeparator + real));
+            Assert.Null(FfmpegRunner.LocateIn(relative));                                   // a relative entry could be anyone's folder
+            Assert.Null(FfmpegRunner.LocateIn("." + Path.PathSeparator + ""));
+            Assert.Equal(Path.Combine(real, "ffmpeg.exe"), FfmpegRunner.LocateIn(relative + Path.PathSeparator + real));
+        }
+        finally { Directory.Delete(real, true); }
     }
 
     [Fact]
