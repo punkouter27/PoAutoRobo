@@ -58,9 +58,12 @@ public static class Durations
 
     public static readonly TimeSpan MaxEpisode = TimeSpan.FromMinutes(5);
 
-    /// <summary>Estimated running time of the episode as currently set (each clip's active tier).</summary>
-    public static TimeSpan Total(Episode episode) =>
-        TimeSpan.FromTicks(episode.Clips.Sum(c => Estimate(c.Active.Dialogue).Ticks));
+    /// <summary>
+    /// Running time of the episode as currently set (each clip's active tier): a clip's recorded length when
+    /// <paramref name="measured"/> knows it, the estimate from its words otherwise.
+    /// </summary>
+    public static TimeSpan Total(Episode episode, Func<Clip, TimeSpan?>? measured = null) =>
+        TimeSpan.FromTicks(episode.Clips.Sum(c => (measured?.Invoke(c) ?? Estimate(c.Active.Dialogue)).Ticks));
 
     /// <summary>In plain words, how the running time misses the series' three to five minutes; null when it does not.</summary>
     public static string? RuntimeWarning(TimeSpan total) =>

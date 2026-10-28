@@ -148,13 +148,14 @@ public sealed class ProjectStoreTests : IDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(original, file))!);
             File.WriteAllText(Path.Combine(original, file), file);
         }
-        var episode = Change(NewEpisode(2), 0, c => c with { Visual = new VisualSpec(VisualKind.Still, MediaPaths: [Path.Combine(original, @"images\a.png")]) });
+        var episode = Change(NewEpisode(2) with { Number = 4 }, 0, c => c with { Visual = new VisualSpec(VisualKind.Still, MediaPaths: [Path.Combine(original, @"images\a.png")]) });
         episode = Change(episode, 1, c => c with { Visual = new VisualSpec(VisualKind.UserVideo, KindLocked: true, UserVideoPath: Path.Combine(original, @"imports\lab.mp4")) });
         ProjectStore.Save(episode, original);
 
         var copy = ProjectStore.Duplicate(original, _folder);
 
-        Assert.Equal(Path.Combine(_folder, "balance-copy"), copy);
+        Assert.Equal(Path.Combine(_folder, "05-balance-copy"), copy); // the next in the series: two episodes never share a number
+        Assert.Equal(5, ProjectStore.Load(copy).Number);
         Assert.False(Directory.Exists(Path.Combine(copy, "export")));
         Assert.False(File.Exists(Path.Combine(copy, SpendLog.FileName))); // what the original cost is not counted twice
         var loaded = ProjectStore.Load(copy);
@@ -165,6 +166,18 @@ public sealed class ProjectStoreTests : IDisposable
         Assert.Equal(Path.Combine(copy, @"imports\lab.mp4"), loaded.Clips[1].Visual.UserVideoPath);
         Assert.True(File.Exists(loaded.Clips[0].Visual.MediaPaths![0]) && File.Exists(loaded.Clips[1].Visual.UserVideoPath));
         Assert.Equal(Json(episode), Json(ProjectStore.Load(original))); // the original is untouched
+
+        // A clip copied inside the episode keeps the recordings of the one it came from, so they are not paid for twice.
+        var id = loaded.Clips[0].Id;
+        var spoken = Path.Combine(copy, "audio", $"{id:N}-0123456789abcdef");
+        Directory.CreateDirectory(Path.GetDirectoryName(spoken)!);
+        File.WriteAllText(spoken + ".wav", "voice");
+        File.WriteAllText(spoken + ".words.json", "[]");
+        var twin = Guid.NewGuid();
+        EpisodeBuilder.CopyRecordings(id, twin, copy);
+        Assert.Equal("voice", File.ReadAllText(Path.Combine(copy, "audio", $"{twin:N}-0123456789abcdef.wav")));
+        Assert.True(File.Exists(Path.Combine(copy, "audio", $"{twin:N}-0123456789abcdef.words.json")));
+        EpisodeBuilder.CopyRecordings(id, twin, original); // an episode with nothing recorded yet has nothing to copy
     }
 
     [Fact]
@@ -202,6 +215,8 @@ public sealed class ProjectStoreTests : IDisposable
         Assert.Equal(("Hook", true), (reopened.Clips[0].Beat, reopened.Clips[0].OwnSound));
         Assert.Equal((null, false), (reopened.Clips[1].Beat, reopened.Clips[1].OwnSound));
         Assert.Equal(7, Assert.Single(ProjectStore.Summaries(_folder)).Number);
+        // The library shows recorded lengths where there are some, as the open episode's header does.
+        Assert.Equal(TimeSpan.FromSeconds(20), Assert.Single(ProjectStore.Summaries(_folder, (_, _) => TimeSpan.FromSeconds(10))).Runtime);
 
         // Saved before episodes were numbered: no number, the story structure, and every clip narrated.
         var older = Path.Combine(_folder, "older");

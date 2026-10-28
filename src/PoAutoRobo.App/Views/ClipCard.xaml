@@ -44,7 +44,7 @@
                 <ProgressRing IsActive="{x:Bind Card.Working, Mode=OneWay}" IsIndeterminate="{x:Bind Card.ProgressUnknown, Mode=OneWay}" Value="{x:Bind Card.Progress, Mode=OneWay}" Width="32" Height="32" />
             </Grid>
         </Grid>
-        <TextBlock Text="{x:Bind Card.Heading, Mode=OneWay}" Style="{ThemeResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{x:Bind Card.Heading, Mode=OneWay}" Style="{ThemeResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
     </StackPanel>
     </Border>
 </UserControl>

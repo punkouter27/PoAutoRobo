@@ -151,6 +151,18 @@ public sealed partial class EpisodeBuilder
         return Path.Combine(folder, "audio", $"{clip.Id:N}-{key}.wav");
     }
 
+    /// <summary>
+    /// Gives a copied clip the recordings of the clip it was copied from. They are named by the clip, so without this
+    /// the copy would be recorded again, and paid for again, for the very same words.
+    /// </summary>
+    public static void CopyRecordings(Guid from, Guid to, string folder)
+    {
+        var audio = Path.Combine(folder, "audio");
+        if (!Directory.Exists(audio)) return;
+        foreach (var file in Directory.EnumerateFiles(audio, $"{from:N}-*"))
+            File.Copy(file, Path.Combine(audio, $"{to:N}{Path.GetFileName(file)[32..]}"), overwrite: true);
+    }
+
     /// <summary>How long the clip's narration really runs, once it has been recorded; null until then.</summary>
     public TimeSpan? MeasuredDuration(Clip clip, string folder)
     {

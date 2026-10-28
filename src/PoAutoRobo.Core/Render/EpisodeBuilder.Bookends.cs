@@ -1,6 +1,6 @@
 namespace PoAutoRobo.Core.Render;
 
-// The series intro and outro every episode is wrapped in, and the stills and drafts of them the Intro step shows.
+// The series intro and outro every episode is wrapped in, and the stills and drafts of them the Series step shows.
 public sealed partial class EpisodeBuilder
 {
     /// <summary>How long the series intro runs.</summary>
@@ -18,7 +18,7 @@ public sealed partial class EpisodeBuilder
 
     /// <summary>
     /// The intro's sting or the outro's music on its own, exactly as it will play: the series' own cut to the intro's
-    /// length or repeated to fill the outro, or the app's made-up one. For the Intro step to listen to; free.
+    /// length or repeated to fill the outro, or the app's made-up one. For the Series step to listen to; free.
     /// </summary>
     /// <returns>The sound file's path, in the clip cache.</returns>
     public async Task<string> BookendSoundAsync(bool intro, Brand brand, CancellationToken ct)
@@ -169,7 +169,7 @@ public sealed partial class EpisodeBuilder
         return output;
     }
 
-    // Sharp enough for the Intro step's screen, and few frames to work through before the one taken.
+    // Sharp enough for the Series step's screen, and few frames to work through before the one taken.
     private static readonly ExportPreset StillSize = new(1280, 720, 10);
     /// <summary>The intro's line for the episode, "#7 · Walking up stairs"; never empty, as the intro always draws it.</summary>
     private static string TitleLine(Episode episode)

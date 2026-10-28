@@ -206,7 +206,13 @@ public partial class MainViewModel
     private void AddClip() => InsertAfterSelected(EpisodeEditor.NewClip());
 
     [RelayCommand(CanExecute = nameof(HasSelection))]
-    private void DuplicateClip() => InsertAfterSelected(EpisodeEditor.Copy(SelectedClip!.Clip));
+    private void DuplicateClip()
+    {
+        var copy = EpisodeEditor.Copy(SelectedClip!.Clip);
+        if (EpisodeFolder is { } folder)
+            EpisodeBuilder.CopyRecordings(SelectedClip.Id, copy.Id, folder); // before the edit, so the copy's card shows its real length
+        InsertAfterSelected(copy);
+    }
 
     private void InsertAfterSelected(Clip clip)
     {

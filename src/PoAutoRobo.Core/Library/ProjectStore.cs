@@ -103,15 +103,20 @@ public static class ProjectStore
                 .OrderByDescending(folder => File.GetLastWriteTimeUtc(Path.Combine(folder, FileName)))]
             : [];
 
-    /// <summary>What the library shows for each saved episode. A damaged one is still listed, so it can be opened and restored.</summary>
-    public static IReadOnlyList<EpisodeSummary> Summaries(string root) =>
+    /// <summary>
+    /// What the library shows for each saved episode. A damaged one is still listed, so it can be opened and restored.
+    /// <paramref name="measured"/> gives a clip's recorded length in its folder, so the list shows the running time the
+    /// open episode's header does; without it the lengths are estimated from the words.
+    /// </summary>
+    public static IReadOnlyList<EpisodeSummary> Summaries(string root, Func<Clip, string, TimeSpan?>? measured = null) =>
         [.. ListEpisodes(root).Select(folder =>
         {
             var saved = File.GetLastWriteTime(Path.Combine(folder, FileName));
             try
             {
                 var episode = Load(folder);
-                return new EpisodeSummary(folder, episode.Title, episode.Cover(), episode.Clips.Count, Durations.Total(episode), saved, episode.Number);
+                var runtime = Durations.Total(episode, measured is null ? null : clip => measured(clip, folder));
+                return new EpisodeSummary(folder, episode.Title, episode.Cover(), episode.Clips.Count, runtime, saved, episode.Number);
             }
             catch (InvalidDataException)
             {
@@ -161,12 +166,16 @@ public static class ProjectStore
         [.. JsonFile.Load<List<GroundingSnippet>>(Path.Combine(folder, SnippetsFile), [], JsonOptions)
             .Where(s => s is { Repo: not null, Path: not null, Text: not null } && Files.IsWebLink(s.Url ?? ""))];
 
-    /// <summary>Copies an episode to a new folder beside it, without its finished videos or its spending, and returns that folder.</summary>
+    /// <summary>
+    /// Copies an episode to a new folder beside it, without its finished videos or its spending, and returns that folder.
+    /// A numbered episode's copy is the next in the series, so two episodes never share a number.
+    /// </summary>
     public static string Duplicate(string folder, string root)
     {
         var episode = Load(folder);
         var title = episode.Title + " copy";
-        var copy = NewFolder(root, title);
+        var number = episode.Number > 0 ? NextNumber(root) : 0;
+        var copy = NewFolder(root, title, number);
         foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(folder, file);
@@ -183,6 +192,7 @@ public static class ProjectStore
         Save(episode with
         {
             Title = title,
+            Number = number,
             MusicPath = episode.MusicPath is { } music ? Moved(music) : null,
             Clips = [.. episode.Clips.Select(c => c with
             {
