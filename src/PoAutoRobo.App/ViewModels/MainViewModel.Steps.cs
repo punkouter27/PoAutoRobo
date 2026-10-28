@@ -22,9 +22,9 @@ public sealed record GuideItem(string Text, bool Done, bool Next = false, bool O
 public partial class MainViewModel
 {
     // The steps, in the order the selector in the header shows them. The pages bind to the numbers.
-    public const int IntroStep = 0, LessonStep = 1, ClipsStep = 2, PreviewStep = 3, PublishStep = 4;
+    public const int SeriesStep = 0, LessonStep = 1, ClipsStep = 2, PreviewStep = 3, PublishStep = 4;
 
-    private static readonly string[] StepNames = ["Intro", "Lesson", "Clips", "Preview", "Publish"];
+    private static readonly string[] StepNames = ["Series", "Lesson", "Clips", "Preview", "Publish"];
 
     private static readonly string[] StepHints =
     [
@@ -46,7 +46,7 @@ public partial class MainViewModel
         get => _step;
         set
         {
-            var wanted = value is IntroStep or LessonStep || (value is >= ClipsStep and <= PublishStep && HasEpisode) ? value : LessonStep;
+            var wanted = value is SeriesStep or LessonStep || (value is >= ClipsStep and <= PublishStep && HasEpisode) ? value : LessonStep;
             if (wanted == _step)
             {
                 if (wanted != value) OnPropertyChanged(nameof(Step));
@@ -61,13 +61,13 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(ShowPublish));
             OnPropertyChanged(nameof(StepHint));
             if (wanted == LessonStep) _ = Guard(RefreshLibraryAsync);
-            if (wanted == IntroStep) RedrawStill(); // what was drawn last may be out of date: the episode number moves on
+            if (wanted == SeriesStep) RedrawStill(); // what was drawn last may be out of date: the episode number moves on
             ErrorMessage = null; // an error belongs to the page it happened on
         }
     }
 
     // While a script is being written the deck page shows in place of the others, with placeholder cards.
-    public bool ShowIntro => Step == IntroStep && !IsCreating;
+    public bool ShowIntro => Step == SeriesStep && !IsCreating;
 
     public bool ShowTopic => Step == LessonStep && !IsCreating;
 
@@ -90,7 +90,7 @@ public partial class MainViewModel
     /// Where the app opens with no episode to go back to: the intro until the channel has a name, as nothing is
     /// branded without one, and the lesson after that.
     /// </summary>
-    private int FirstStep => _kit.ChannelName.Length > 0 ? LessonStep : IntroStep;
+    private int FirstStep => _kit.ChannelName.Length > 0 ? LessonStep : SeriesStep;
 
     // ---- The bar under the header ----
 
@@ -101,7 +101,7 @@ public partial class MainViewModel
         {
             var items = Step switch
             {
-                IntroStep => IntroGuide(),
+                SeriesStep => IntroGuide(),
                 LessonStep => LessonGuide(),
                 ClipsStep => ClipsGuide(),
                 PreviewStep => PreviewGuide(),
@@ -121,15 +121,16 @@ public partial class MainViewModel
         new("Watch the intro", IntroPreviewPath is not null, Optional: true),
     ];
 
-    // A lesson typed in while an episode is open is the start of the next one, so its script is not written yet.
+    // The open episode's lesson is done, script and all; the form for the next one starts with nothing done.
     private List<GuideItem> LessonGuide()
     {
         var typed = !string.IsNullOrWhiteSpace(TopicInput);
-        var written = HasEpisode && !typed;
+        var written = ShowOpenLesson;
+        var films = written ? OpenFilms : Footage.Count;
         return
         [
             new("What you taught", typed || written),
-            new(Footage.Count == 0 ? "Films" : $"Films · {Footage.Count}", Footage.Count > 0, Optional: true),
+            new(films == 0 ? "Films" : $"Films · {films}", films > 0, Optional: true),
             new("Write the script", written),
         ];
     }
@@ -186,16 +187,18 @@ public partial class MainViewModel
     {
         if (Step == ClipsStep && !StepDone && NextJob() is var (label, command) && command != MakeDraftCommand)
             return (label, command, true);
-        if (Step < PublishStep && (Step == IntroStep || HasEpisode))
+        // Writing the next episode, moving on would go to the clips of the one still open: the form's own button is the way on.
+        if (Step == LessonStep && ShowLessonForm)
+            return ("", null, false);
+        if (Step < PublishStep && (Step == SeriesStep || HasEpisode))
             return ($"Continue to {StepNames[Step + 1]}", ContinueCommand, StepDone && !PageButtonIsNext);
         return ("", null, false);
     }
 
-    // The page's own big button is still the thing to do: writing a script typed in, or building the preview.
+    // The page's own big button is still the thing to do: building the preview, or watching the intro.
     private bool PageButtonIsNext => Step switch
     {
-        IntroStep => _kit.ChannelName.Length > 0 && IntroPreviewPath is null,
-        LessonStep => !string.IsNullOrWhiteSpace(TopicInput),
+        SeriesStep => _kit.ChannelName.Length > 0 && IntroPreviewPath is null,
         PreviewStep => !HasPreview,
         _ => false,
     };
@@ -203,14 +206,8 @@ public partial class MainViewModel
     /// <summary>The lesson page's Write the script button is lit while a lesson is typed in: it is what to do next.</summary>
     public bool WriteIsNext => !string.IsNullOrWhiteSpace(TopicInput);
 
-    /// <summary>The intro page's Show the intro button is lit until the intro has been watched this time.</summary>
+    /// <summary>The series page's Show the intro button is lit until the intro has been watched this time.</summary>
     public bool ShowIntroIsNext => IntroPreviewPath is null;
-
-    /// <summary>
-    /// The menu beside the bar's button on the clips page, with advanced controls on: each job on its own, and all of
-    /// them as one, ending on a draft to watch. The bar's button already offers the next job, so most never need it.
-    /// </summary>
-    public bool ShowJobs => Step == ClipsStep && HasEpisode && Advanced;
 
     [RelayCommand]
     private void Continue() => Step = Math.Min(Step + 1, PublishStep);
@@ -224,7 +221,7 @@ public partial class MainViewModel
     // What the bar reads from. Any of these changing may tick an item off, so the bar is told to look again.
     private static readonly HashSet<string> GuideSources =
     [
-        nameof(Step), nameof(TopicInput), nameof(Episode), nameof(Preview), nameof(LastExport), nameof(HasTeasers),
+        nameof(Step), nameof(TopicInput), nameof(StartingNew), nameof(Episode), nameof(Preview), nameof(LastExport), nameof(HasTeasers),
         nameof(IntroPreviewPath), nameof(SeriesChannel), nameof(SeriesBrand), nameof(IsConnected), nameof(Runtime),
     ];
 
@@ -235,7 +232,7 @@ public partial class MainViewModel
 
     private void RefreshGuide()
     {
-        foreach (var name in (string[])[nameof(Guide), nameof(GuideActionLabel), nameof(HasGuideAction), nameof(GuideActionIsNext), nameof(WriteIsNext), nameof(ShowIntroIsNext), nameof(ShowJobs)])
+        foreach (var name in (string[])[nameof(Guide), nameof(GuideActionLabel), nameof(HasGuideAction), nameof(GuideActionIsNext), nameof(WriteIsNext), nameof(ShowIntroIsNext)])
             OnPropertyChanged(name);
     }
 }

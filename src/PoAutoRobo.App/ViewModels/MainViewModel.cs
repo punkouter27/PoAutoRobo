@@ -91,7 +91,7 @@ public partial class MainViewModel : ObservableObject
         try
         {
             Open(ProjectStore.Load(folder), folder, ProjectStore.LoadSnippets(folder));
-            Step = Math.Clamp(last.Page, IntroStep, PublishStep);
+            Step = Math.Clamp(last.Page, SeriesStep, PublishStep);
             // The tab is set once the clips page has been laid out: its tab control picks its first tab as it first appears.
             var tab = Math.Clamp(last.InspectorTab, 0, 1);
             if (Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread() is { } later)
@@ -174,12 +174,11 @@ public partial class MainViewModel : ObservableObject
     public partial bool DraftPictures { get; set; }
 
     /// <summary>
-    /// The controls most episodes never need: each clip's depth, host, picture type, takes and robot's-eye view, the jobs
-    /// menu, designing the host, the outro's length, caption size and outline, teasers' moments, other video sizes and
-    /// the services' model names. Hidden unless turned on.
+    /// The controls most episodes never need: each clip's depth, host, picture type, takes and robot's-eye view,
+    /// designing the host, the outro's length, caption size and outline, teasers' moments, other video sizes and the
+    /// services' model names. Hidden unless turned on.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowJobs))]
     public partial bool Advanced { get; set; }
 
     partial void OnAdvancedChanged(bool value)
@@ -232,7 +231,7 @@ public partial class MainViewModel : ObservableObject
         new("Story", BeatStructure.Story), new("Tutorial", BeatStructure.Tutorial), new("Hook first", BeatStructure.HookFirst),
     ];
 
-    /// <summary>The shape of the next episode: the series' own, set on the Intro step.</summary>
+    /// <summary>The shape of the next episode: the series' own, set on the Series step.</summary>
     private BeatStructure NextStructure => _kit.Structure;
 
     /// <summary>The beats of the chosen structure in order, marking those where footage belongs.</summary>
@@ -245,9 +244,10 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EpisodeTitle), nameof(HasEpisode), nameof(Runtime), nameof(Captions),
-        nameof(CaptionPresetIndex), nameof(CaptionFontSize), nameof(CaptionStroke), nameof(CaptionsTuned), nameof(CaptionAccent), nameof(HasMusic), nameof(MusicLabel), nameof(EpisodeOffSeriesLook))]
+        nameof(CaptionPresetIndex), nameof(CaptionFontSize), nameof(CaptionStroke), nameof(CaptionsTuned), nameof(CaptionAccent), nameof(HasMusic), nameof(MusicLabel), nameof(EpisodeOffSeriesLook),
+        nameof(ShowLessonForm), nameof(ShowOpenLesson), nameof(OpenTopic), nameof(OpenNumberText), nameof(OpenFilmsText))]
     [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(UseSeriesLookCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(NarrateAllCommand),
-        nameof(CleanMediaCommand), nameof(RenameEpisodeCommand), nameof(MakeDraftCommand), nameof(RemoveMusicCommand),
+        nameof(CleanMediaCommand), nameof(RenameEpisodeCommand), nameof(CopyOpenEpisodeCommand), nameof(ShowOpenEpisodeCommand), nameof(DeleteOpenEpisodeCommand), nameof(MakeDraftCommand), nameof(RemoveMusicCommand),
         nameof(WatchClipCommand), nameof(WatchTeaserCommand), nameof(MakeThumbnailsCommand), nameof(UploadShortsCommand))]
     public partial Episode? Episode { get; set; }
 

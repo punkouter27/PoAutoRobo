@@ -101,12 +101,12 @@
                     </Grid.RowDefinitions>
                     <TextBlock Text="Logo" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SeriesLogoLabel, Mode=OneWay}" Style="{StaticResource QuietText}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-                    <Button Grid.Column="2" Content="Pick…" Tag="logo" Click="OnPick" ToolTipService.ToolTip="Choose your logo: a PNG, best with a see-through background. It sits in a top corner of the intro and outro. The app keeps its own copy." />
+                    <Button Grid.Column="2" Content="Pick…" Tag="logo" AutomationProperties.Name="Pick a logo" Click="OnPick" ToolTipService.ToolTip="Choose your logo: a PNG, best with a see-through background. It sits in a top corner of the intro and outro. The app keeps its own copy." />
                     <Button Grid.Column="3" Style="{StaticResource IconButton}" Tag="logo" Click="OnClear" Visibility="{x:Bind local:IntroPage.Picked(ViewModel.SeriesLogoLabel), Mode=OneWay}" AutomationProperties.Name="Use the app's logo" ToolTipService.ToolTip="Go back to the logo the app makes for you: a robot's head in the series colour."><SymbolIcon Symbol="Cancel" /></Button>
 
                     <TextBlock Grid.Row="1" Text="Mascot" VerticalAlignment="Center" />
                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.SeriesMascotLabel, Mode=OneWay}" Style="{StaticResource QuietText}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-                    <Button Grid.Row="1" Grid.Column="2" Content="Pick…" Tag="mascot" Click="OnPick" ToolTipService.ToolTip="Choose a PNG of your mascot, shown beside the words in the intro and outro. Or use the button below for the host you designed." />
+                    <Button Grid.Row="1" Grid.Column="2" Content="Pick…" Tag="mascot" AutomationProperties.Name="Pick a mascot" Click="OnPick" ToolTipService.ToolTip="Choose a PNG of your mascot, shown beside the words in the intro and outro. Or use the button below for the host you designed." />
                     <Button Grid.Row="1" Grid.Column="3" Style="{StaticResource IconButton}" Tag="mascot" Click="OnClear" Visibility="{x:Bind local:IntroPage.Picked(ViewModel.SeriesMascotLabel), Mode=OneWay}" AutomationProperties.Name="Use the app's mascot" ToolTipService.ToolTip="Go back to the mascot the app makes for you: a robot standing ready, in the series colour."><SymbolIcon Symbol="Cancel" /></Button>
                 </Grid>
                 <!-- A logo drawn for the channel, the way the host is: three candidates, one clicked to use -->
@@ -196,13 +196,13 @@
                     <!-- Each sound as it will play, to hear before watching the whole intro or outro; pressed again, it stops -->
                     <Button x:Name="StingPlayButton" Grid.Column="2" Style="{StaticResource IconButton}" Tag="sting" Click="OnListen" AutomationProperties.Name="Play the sting"
                             ToolTipService.ToolTip="Listen to the intro's sting as it will play: yours cut to five seconds, or the one the app makes. Press again to stop. Costs nothing."><SymbolIcon x:Name="StingPlayIcon" Symbol="Play" /></Button>
-                    <Button Grid.Column="3" Content="Pick…" Tag="sting" Click="OnPick" ToolTipService.ToolTip="Choose a few seconds of music for the intro (MP3, WAV, M4A, FLAC or OGG). Anything past five seconds is cut. With none, the app makes one that fits the swarm of light." />
+                    <Button Grid.Column="3" Content="Pick…" Tag="sting" AutomationProperties.Name="Pick intro music" Click="OnPick" ToolTipService.ToolTip="Choose a few seconds of music for the intro (MP3, WAV, M4A, FLAC or OGG). Anything past five seconds is cut. With none, the app makes one that fits the swarm of light." />
                     <Button Grid.Column="4" Style="{StaticResource IconButton}" Tag="sting" Click="OnClear" Visibility="{x:Bind local:IntroPage.Picked(ViewModel.SeriesStingLabel), Mode=OneWay}" AutomationProperties.Name="Use the app's sting" ToolTipService.ToolTip="Go back to the sting the app makes for you: a robot waking for its lesson, servos turning and data blips quickening into the hit."><SymbolIcon Symbol="Cancel" /></Button>
                     <TextBlock Grid.Row="1" Text="Outro" VerticalAlignment="Center" />
                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.SeriesMusicLabel, Mode=OneWay}" Style="{StaticResource QuietText}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
                     <Button x:Name="MusicPlayButton" Grid.Row="1" Grid.Column="2" Style="{StaticResource IconButton}" Tag="music" Click="OnListen" AutomationProperties.Name="Play the outro music"
                             ToolTipService.ToolTip="Listen to the outro's music as it will play, for the outro's whole length: yours, repeated to fill it if it is short, or the tune the app makes. Press again to stop. Costs nothing."><SymbolIcon x:Name="MusicPlayIcon" Symbol="Play" /></Button>
-                    <Button Grid.Row="1" Grid.Column="3" Content="Pick…" Tag="music" Click="OnPick"
+                    <Button Grid.Row="1" Grid.Column="3" Content="Pick…" Tag="music" AutomationProperties.Name="Pick outro music" Click="OnPick"
                             ToolTipService.ToolTip="Use your own music for the outro of every new episode (MP3, WAV, M4A, FLAC or OGG). Music plays only over the intro and outro, never under the clips. Until you choose, the app makes a robot-lab tune. Use music you have the right to publish." />
                     <Button Grid.Row="1" Grid.Column="4" Style="{StaticResource IconButton}" Tag="music" Click="OnClear" Visibility="{x:Bind local:IntroPage.Picked(ViewModel.SeriesMusicLabel), Mode=OneWay}" AutomationProperties.Name="Use the app's outro music"
                             ToolTipService.ToolTip="Go back to the app's own outro tune: a robot lab winding down, soft chords, bright blips and a steady pulse."><SymbolIcon Symbol="Cancel" /></Button>
@@ -268,7 +268,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Button x:Name="PreviewIntroButton" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.PreviewIntroCommand}"
+                    <Button x:Name="PreviewIntroButton" AutomationProperties.Name="Show the intro" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.PreviewIntroCommand}"
                             Style="{x:Bind app:Ui.Primary(ViewModel.ShowIntroIsNext), Mode=OneWay}"
                             ToolTipService.ToolTip="Plays the intro in full, moving and with its sound: the swarm of light gathering into the picture above, for the next episode's number. Takes a few seconds to draw; made on this computer, it costs nothing.">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
@@ -276,7 +276,7 @@
                             <TextBlock Text="Show the intro" />
                         </StackPanel>
                     </Button>
-                    <Button x:Name="PreviewOutroButton" Grid.Column="1" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.PreviewOutroCommand}"
+                    <Button x:Name="PreviewOutroButton" AutomationProperties.Name="Show the outro" Grid.Column="1" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.PreviewOutroCommand}"
                             ToolTipService.ToolTip="Draws the outro that ends every episode, at its full length, and plays it. The two faint frames on the right are where YouTube's end-screen cards go. Made on this computer; it costs nothing.">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
                             <SymbolIcon Symbol="Play" />

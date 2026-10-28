@@ -45,9 +45,10 @@ Warnings are errors, analyzer and style rules included, and so is a package with
     YouTube upload (`YouTube`), thumbnails (`Thumbnails`) and the chapter list.
 - `src/PoAutoRobo.App`: the window (`MainWindow`, with `.Dialogs` and `.Taskbar` beside it). One view
   model, `MainViewModel`, in partial files by concern (`.Steps`, `.Library`, `.Footage`, `.Edits`, `.Pictures`,
-  `.Export`, `.Publish`, `.Series`, `.Teasers`, `.Activity`); views in `Views/`. Five steps, Intro, Lesson, Clips, Preview and
-  Publish, each with a checklist under the header (`MainViewModel.Guide`); name a step by its constant
-  (`MainViewModel.ClipsStep`), never its number.
+  `.Export`, `.Publish`, `.Series`, `.Teasers`, `.Activity`); views in `Views/`. Five steps, Series (the brand kit, on
+  `IntroPage`), Lesson, Clips, Preview and Publish, each with a checklist under the header (`MainViewModel.Guide`); name
+  a step by its constant (`MainViewModel.ClipsStep`), never its number. A step's own actions sit on its page beside
+  what they act on; the header holds only Undo, Redo, Settings and, under …, what is done to the open episode as a whole.
 - `tests/PoAutoRobo.Core.Tests`: tests of the core. The app project has none.
 
 ## Rules that are easy to break
@@ -94,7 +95,7 @@ Warnings are errors, analyzer and style rules included, and so is a package with
 - **Choices remembered between runs live in Settings** (`Views/SettingsPanel`, in the side panel at the window's right,
   saved in `Prefs`), not in a flyout of their own. Questions about money or publishing (`Confirm`, `ConfirmSpend`) stay
   modal dialogs. What every episode of the series shares (its look, its shape, its intro and outro) is the brand kit's,
-  set on the Intro step.
+  set on the Series step.
 
 ## Conventions
 

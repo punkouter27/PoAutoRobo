@@ -138,7 +138,7 @@ public partial class MainViewModel
             ErrorMessage = "The video is finished, but its upload description could not be written. " + Plain(e);
         }
         ShowMaster(video);
-        var bookends = _kit.ChannelName.Trim().Length > 0 ? "" : " It has no intro or outro: give the channel a name on the Intro step to add them.";
+        var bookends = _kit.ChannelName.Trim().Length > 0 ? "" : " It has no intro or outro: give the channel a name on the Series step to add them.";
         StatusMessage = $"Saved {Path.GetFileName(video)}, with its chapter list{withNotes} beside it.{bookends}";
     }
 

@@ -11,7 +11,7 @@ public sealed record IntroStart(string Name, string Accent, IntroLayout Layout)
     public Windows.UI.Color Colour => Views.Colours.FromHex(Accent);
 }
 
-/// <summary>The series brand kit: what every episode shares, set up once on the Intro step.</summary>
+/// <summary>The series brand kit: what every episode shares, set up once on the Series step.</summary>
 public partial class MainViewModel
 {
     // Each look with the words shown for it, kept together so the list cannot drift out of step with the looks there are.
@@ -71,7 +71,7 @@ public partial class MainViewModel
 
     /// <summary>
     /// The open episode looks other than the series now does: made before the picture style, captions or outro music
-    /// changed. The Intro step then offers to bring it into line.
+    /// changed. The Series step then offers to bring it into line.
     /// </summary>
     public bool EpisodeOffSeriesLook => Episode is { } episode && (EpisodeEditor.UseSeriesLook(episode, _kit, null) != episode
         || (_kit.Music is { } music && !string.Equals(Path.GetFileName(episode.MusicPath), "music-" + music, StringComparison.OrdinalIgnoreCase)));
@@ -109,17 +109,17 @@ public partial class MainViewModel
 
     public string SeriesMascotLabel => _kit.Mascot ?? MadeForYou;
 
-    /// <summary>The intro last drawn for the Intro step; null until one is asked for.</summary>
+    /// <summary>The intro last drawn for the Series step; null until one is asked for.</summary>
     [ObservableProperty]
     public partial string? IntroPreviewPath { get; set; }
 
-    /// <summary>The outro last drawn for the Intro step; null until one is asked for.</summary>
+    /// <summary>The outro last drawn for the Series step; null until one is asked for.</summary>
     [ObservableProperty]
     public partial string? OutroPreviewPath { get; set; }
 
     /// <summary>
     /// A still of the intro (or of the outro, once Show the outro has been pressed) as the settings stand now, redrawn a
-    /// moment after each change so the Intro step follows what is done on the left. Null until the first is drawn.
+    /// moment after each change so the Series step follows what is done on the left. Null until the first is drawn.
     /// </summary>
     [ObservableProperty]
     public partial string? StillPath { get; set; }
@@ -130,7 +130,7 @@ public partial class MainViewModel
     // A burst of changes, such as typing a name, draws once, a moment after the last. Each still is drawn here, for free.
     private void RedrawStill()
     {
-        if (!FfmpegAvailable || Step != IntroStep) return;
+        if (!FfmpegAvailable || Step != SeriesStep) return;
         _still?.Cancel();
         _still?.Dispose(); // the still it was drawing has seen the cancel; nothing waits on its token
         _still = new CancellationTokenSource();
@@ -142,7 +142,7 @@ public partial class MainViewModel
         try
         {
             await Task.Delay(300, ct);
-            var number = Episode?.Number is > 0 and var n ? n : Math.Max(1, (int)EpisodeNumber);
+            var number = Math.Max(1, (int)EpisodeNumber); // the next episode's, as the sample title "Your next lesson" says
             var still = await _builder.BookendStillAsync(!_stillOfOutro, SeriesBrand, number, ct);
             if (!ct.IsCancellationRequested) StillPath = still;
         }
@@ -293,7 +293,7 @@ public partial class MainViewModel
     {
         if (!FfmpegAvailable)
             throw new InvalidOperationException("FFmpeg is needed to draw the intro. Install it, then restart the app.");
-        var number = Episode?.Number is > 0 and var n ? n : Math.Max(1, (int)EpisodeNumber);
+        var number = Math.Max(1, (int)EpisodeNumber); // the next episode's, as the sample title "Your next lesson" says
         _stillOfOutro = false;
         IntroPreviewPath = await _builder.PreviewIntroAsync(SeriesBrand, number, _closing.Token);
     });
@@ -308,7 +308,7 @@ public partial class MainViewModel
         OutroPreviewPath = await _builder.PreviewOutroAsync(SeriesBrand, _closing.Token);
     });
 
-    /// <summary>The intro's sting or the outro's music as it will play, to listen to on the Intro step; null when it cannot be made. Free.</summary>
+    /// <summary>The intro's sting or the outro's music as it will play, to listen to on the Series step; null when it cannot be made. Free.</summary>
     public async Task<string?> BookendSoundAsync(bool intro)
     {
         string? path = null;

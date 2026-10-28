@@ -32,8 +32,11 @@
             </GridView.ItemTemplate>
         </GridView>
 
-        <!-- YouTube -->
+        <!-- YouTube: once there is a video to send. Its description and titles are written with the render. -->
         <TextBlock Text="YouTube" Style="{ThemeResource BodyStrongTextBlockStyle}" Margin="0,8,0,0" />
+        <TextBlock Text="Render the master video first: its title, description and chapters are filled in from it, ready to send." Style="{StaticResource QuietText}" TextWrapping="Wrap"
+                   Visibility="{x:Bind app:Ui.Hide(ViewModel.HasExport), Mode=OneWay}" />
+        <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.HasExport, Mode=OneWay}">
         <TextBox Header="Title" Text="{x:Bind ViewModel.UploadTitle, Mode=TwoWay}" MaxLength="100"
                  ToolTipService.ToolTip="The video's title on YouTube, up to 100 characters. Filled in from the titles written with the master video." />
         <TextBox Header="Description" Text="{x:Bind ViewModel.UploadDescription, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220"
@@ -54,10 +57,9 @@
         <Border ToolTipService.ToolTip="{x:Bind ViewModel.UploadTip, Mode=OneWay}">
             <Button HorizontalAlignment="Stretch" MinHeight="44" Content="Upload to YouTube" Command="{x:Bind ViewModel.UploadCommand}" />
         </Border>
-        <Border ToolTipService.ToolTip="Send each rendered teaser to your channel as a YouTube Short, titled with its hook and #Shorts, as private, unlisted or public as chosen above. Free. TikTok is not offered: its posting API only works for apps TikTok has approved.">
-            <Button HorizontalAlignment="Stretch" MinHeight="44" Content="Upload teasers as Shorts" Command="{x:Bind ViewModel.UploadShortsCommand}" />
-        </Border>
         <TextBlock Text="{x:Bind ViewModel.UploadTip, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" Visibility="{x:Bind app:Ui.Hide(ViewModel.YouTubeReady), Mode=OneWay}" />
+        </StackPanel>
+        <!-- Outside the YouTube fields: a Short sent from the teasers leaves its link here too -->
         <HyperlinkButton Padding="0" NavigateUri="{x:Bind ViewModel.VideoUri, Mode=OneWay}" Visibility="{x:Bind app:Ui.ShowText(ViewModel.VideoLink), Mode=OneWay}"
                          ToolTipService.ToolTip="Open what was just uploaded on YouTube, in your browser.">
             <TextBlock Text="{x:Bind ViewModel.VideoLink, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True" />

@@ -6,7 +6,7 @@
     xmlns:app="using:PoAutoRobo.App"
     xmlns:vm="using:PoAutoRobo.App.ViewModels"
     xmlns:library="using:PoAutoRobo.Core.Library">
-    <!-- Left: start something new. Right: carry on with something saved. -->
+    <!-- Left: the open episode's lesson, or the next one being started. Right: carry on with something saved. -->
     <Grid>
         <!-- In a small window the form gives some of its width to the saved episodes. -->
         <VisualStateManager.VisualStateGroups>
@@ -31,14 +31,51 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- The lesson, top to bottom in the order it is thought of; the button stays in view below the form. -->
-        <Grid Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource Gap}" Background="{ThemeResource LayerFillColorDefaultBrush}">
+        <!-- With an episode open: the lesson it was written from, and a way to start the next one -->
+        <Grid Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource Gap}" Background="{ThemeResource LayerFillColorDefaultBrush}"
+              Visibility="{x:Bind ViewModel.ShowOpenLesson, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,-12,0" Padding="0,0,12,0">
+                <StackPanel Spacing="{StaticResource GapSmall}">
+                    <TextBlock Text="This episode" Style="{StaticResource QuietText}" />
+                    <TextBlock Text="{x:Bind ViewModel.EpisodeTitle, Mode=OneWay}" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Bind ViewModel.OpenNumberText, Mode=OneWay}" Style="{StaticResource QuietText}" Visibility="{x:Bind app:Ui.ShowText(ViewModel.OpenNumberText), Mode=OneWay}" />
+                    <TextBlock Text="What I taught it" Style="{StaticResource SectionHeading}" />
+                    <TextBlock x:Name="OpenTopicText" Text="{x:Bind ViewModel.OpenTopic, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                               ToolTipService.ToolTip="What this episode's script was written from, as it was typed in. To change what the episode says, edit its clips on the Clips step." />
+                    <TextBlock Text="My footage" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Text="{x:Bind ViewModel.OpenFilmsText, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+            <Button x:Name="NewEpisodeButton" Grid.Row="1" MinHeight="44" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.NewLessonCommand}"
+                    AutomationProperties.Name="New episode"
+                    ToolTipService.ToolTip="Start the next episode: say what you taught the R1, add your films and write its script. This episode stays saved, and stays open until the new script is written. Free until you write the script.">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
+                    <SymbolIcon Symbol="Add" />
+                    <TextBlock Text="New episode" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- The next lesson, top to bottom in the order it is thought of; the button stays in view below the form. -->
+        <Grid Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource Gap}" Background="{ThemeResource LayerFillColorDefaultBrush}"
+              Visibility="{x:Bind ViewModel.ShowLessonForm, Mode=OneWay}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,0,-12,0" Padding="0,0,12,0">
                 <StackPanel Spacing="{StaticResource Gap}">
+                    <!-- Only while another episode is open, so there is somewhere to go back to -->
+                    <HyperlinkButton x:Name="BackToOpenButton" Padding="0" Command="{x:Bind ViewModel.BackToOpenLessonCommand}" Visibility="{x:Bind ViewModel.HasEpisode, Mode=OneWay}"
+                                     ToolTipService.ToolTip="Back to the lesson of the episode that is open. Anything typed here is kept for when you start the next one.">
+                        <TextBlock>
+                            <Run Text="← Back to " /><Run Text="{x:Bind ViewModel.EpisodeTitle, Mode=OneWay}" />
+                        </TextBlock>
+                    </HyperlinkButton>
                     <NumberBox x:Name="NumberBox" Header="Episode" Minimum="1" Maximum="999" SpinButtonPlacementMode="Compact" MinWidth="110" HorizontalAlignment="Left"
                                Value="{x:Bind ViewModel.EpisodeNumber, Mode=TwoWay}" ToolTipService.ToolTip="Where this episode comes in the series. The next number is filled in; change it to redo or skip one." />
                     <TextBox x:Name="TaughtBox" Header="What I taught it" PlaceholderText="Walking up three stairs without the handrail"
@@ -52,7 +89,7 @@
                              AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="140" MaxLength="2000" ScrollViewer.VerticalScrollBarVisibility="Auto" />
                     <Grid>
                         <TextBlock Text="My footage" VerticalAlignment="Center" />
-                        <Button x:Name="AddFootageButton" HorizontalAlignment="Right" Click="OnAddFootage" AllowDrop="True" DragOver="OnFootageDragOver" Drop="OnFootageDrop"
+                        <Button x:Name="AddFootageButton" AutomationProperties.Name="Add films" HorizontalAlignment="Right" Click="OnAddFootage" AllowDrop="True" DragOver="OnFootageDragOver" Drop="OnFootageDrop"
                                 ToolTipService.ToolTip="Add films of the robot (2 seconds to 2 minutes each), or drop them here. The script places each one in the beat its note fits.">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
                                 <SymbolIcon Symbol="Add" />
@@ -143,7 +180,7 @@
                                 <TextBlock Text="{x:Bind Title}" Style="{ThemeResource BodyStrongTextBlockStyle}" MaxLines="2" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{x:Bind Details}" Style="{StaticResource QuietText}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <Button Grid.Column="2" Style="{StaticResource IconButton}" VerticalAlignment="Center" AutomationProperties.Name="Episode actions" ToolTipService.ToolTip="Open, copy, find or delete this episode. Clicking the episode itself opens it.">
+                            <Button Grid.Column="2" Style="{StaticResource IconButton}" VerticalAlignment="Center" AutomationProperties.Name="{x:Bind local:LessonPage.ActionsFor(Title)}" ToolTipService.ToolTip="Open, copy, find or delete this episode. Clicking the episode itself opens it.">
                                 <SymbolIcon Symbol="More" />
                                 <Button.Flyout>
                                     <MenuFlyout>

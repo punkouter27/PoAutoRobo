@@ -19,14 +19,18 @@ public partial class MainViewModel
     public async Task RefreshLibraryAsync()
     {
         var request = ++_libraryRequest;
-        var summaries = await Task.Run(() => ProjectStore.Summaries(AppPaths.Episodes));
+        var summaries = await Task.Run(() => ProjectStore.Summaries(AppPaths.Episodes, _builder.MeasuredDuration));
         if (request != _libraryRequest) return; // a newer listing is on its way
         Library.Clear();
         foreach (var summary in summaries)
             Library.Add(summary);
         // The next in the series, unless the user has typed a number of their own since it was last filled in.
         var next = ProjectStore.NextNumber(summaries);
-        if (double.IsNaN(EpisodeNumber) || (int)EpisodeNumber == _suggestedNumber) EpisodeNumber = next;
+        if (double.IsNaN(EpisodeNumber) || (int)EpisodeNumber == _suggestedNumber)
+        {
+            if ((int)EpisodeNumber != next && Step == SeriesStep) RedrawStill(); // the intro shows the next episode's number
+            EpisodeNumber = next;
+        }
         _suggestedNumber = next;
         OnPropertyChanged(nameof(HasLibrary));
     }
@@ -66,7 +70,8 @@ public partial class MainViewModel
 
     public Task DuplicateEpisodeAsync(EpisodeSummary summary) => Guard(async () =>
     {
-        await Task.Run(() => ProjectStore.Duplicate(summary.Folder, AppPaths.Episodes)); // copies every picture and recording
+        StatusMessage = $"Copying {summary.Title}…"; // every picture and recording, often in a synced folder: it takes a few seconds
+        await Task.Run(() => ProjectStore.Duplicate(summary.Folder, AppPaths.Episodes));
         await RefreshLibraryAsync();
         StatusMessage = $"Copied {summary.Title}.";
     });
@@ -210,6 +215,7 @@ public partial class MainViewModel
         _syncingClips = false;
         SyncCards();
         SelectedClip = Clips.FirstOrDefault();
+        StartingNew = false; // the Lesson step now shows this episode's lesson
         Step = ClipsStep;
         SavePrefs(); // this is now the episode to come back to
         _ = Guard(ShowFootageAsync);
@@ -221,6 +227,54 @@ public partial class MainViewModel
         if (Episode is { } episode && await Ask("Rename episode", episode.Title) is { } title)
             Edit(e => EpisodeEditor.Rename(e, title));
     }
+
+    // The header's … menu does to the open episode what a saved episode's own menu does to it.
+    private EpisodeSummary OpenSummary => new(EpisodeFolder!, Episode!.Title, null, Episode.Clips.Count, Runtime, DateTime.Now, Episode.Number);
+
+    [RelayCommand(CanExecute = nameof(HasEpisode))]
+    private Task CopyOpenEpisodeAsync() => DuplicateEpisodeAsync(OpenSummary);
+
+    [RelayCommand(CanExecute = nameof(HasEpisode))]
+    private void ShowOpenEpisode() => ShowInExplorer(EpisodeFolder!);
+
+    [RelayCommand(CanExecute = nameof(HasEpisode))]
+    private Task DeleteOpenEpisodeAsync() => DeleteEpisodeAsync(OpenSummary);
+
+    // ---- The Lesson step: the open episode's lesson, or the form for the next one ----
+
+    /// <summary>
+    /// True once New episode is pressed with an episode open: the Lesson step then shows the form for the next one in
+    /// place of the open episode's lesson. With no episode open the form is all there is to show.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowLessonForm), nameof(ShowOpenLesson))]
+    public partial bool StartingNew { get; set; }
+
+    public bool ShowLessonForm => !HasEpisode || StartingNew;
+
+    public bool ShowOpenLesson => !ShowLessonForm;
+
+    /// <summary>What the open episode was written from, as it was typed in, and what went wrong with it.</summary>
+    public string OpenTopic => Episode?.Topic ?? "";
+
+    public string OpenNumberText => Episode is { Number: > 0 } episode ? $"Episode {episode.Number}" : "";
+
+    private int OpenFilms => Episode?.Clips.Count(c => c.Visual.UserVideoPath is not null) ?? 0;
+
+    public string OpenFilmsText => OpenFilms switch
+    {
+        0 => "No films: made of pictures only.",
+        1 => "1 of your films is in it.",
+        var n => $"{n} of your films are in it.",
+    };
+
+    /// <summary>Shows the form for the next episode. What was typed in it before is still there.</summary>
+    [RelayCommand]
+    private void NewLesson() => StartingNew = true;
+
+    /// <summary>Back to the open episode's lesson; anything typed for the next one is kept for later.</summary>
+    [RelayCommand]
+    private void BackToOpenLesson() => StartingNew = false;
 
     // ---- Housekeeping ----
 

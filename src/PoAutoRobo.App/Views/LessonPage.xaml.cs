@@ -34,6 +34,9 @@ public sealed partial class LessonPage : UserControl
     // The menu items carry their episode in Tag.
     private static EpisodeSummary? Episode(object sender) => (sender as FrameworkElement)?.Tag as EpisodeSummary;
 
+    /// <summary>Each saved episode's menu button is named by its episode, so a screen reader can tell them apart.</summary>
+    public static string ActionsFor(string title) => $"More for {title}";
+
     private async void OnOpenFromMenu(object sender, RoutedEventArgs e)
     {
         if (ViewModel is not null && Episode(sender) is { } summary)
