@@ -43,3 +43,9 @@ Where this file and `CLAUDE.md` disagree about the code, `CLAUDE.md` wins.
   3. Adult: how it is built, in one technical sentence.
 - **Questions about direction.** After a code change of more than 100 lines, when the prompt asked nothing else,
   ask three optional, high-level questions about where the app is going that could lead to further changes.
+
+## CI/CD and Azure (same section in every Po repo)
+
+- This is a desktop app: `.github/workflows/` builds and runs the tests on every push and pull request. There is nothing to deploy.
+- Tests pass on any machine: no drive-letter, temp-folder or working-directory assumptions, and no live config value hard-coded as an expected result (read it from the same config the app reads).
+- A red run on the default branch gets an ntfy push from the CI watcher in PoPunkouterSoftware. Fix it, or say why it is red.
