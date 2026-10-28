@@ -15,7 +15,7 @@ public sealed class AzureListener(AppSettings settings)
 
     public async Task<IReadOnlyList<WordTiming>> HearAsync(string wavPath, CancellationToken ct)
     {
-        var config = SpeechConfig.FromEndpoint(settings.Endpoint, settings.Credential);
+        var config = await SpeechSignIn.ConfigAsync(settings, ct);
         config.SpeechRecognitionLanguage = "en-US";
         config.RequestWordLevelTimestamps();
         config.OutputFormat = OutputFormat.Detailed;

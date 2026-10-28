@@ -12,7 +12,7 @@ public sealed class AzureNarrator(AppSettings settings) : INarrator
     public async Task<Narration> SynthesizeAsync(string text, string outputPath, double rate, CancellationToken ct)
     {
         Files.EnsureFolderFor(outputPath);
-        var config = SpeechConfig.FromEndpoint(settings.Endpoint, settings.Credential);
+        var config = await SpeechSignIn.ConfigAsync(settings, ct);
         config.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Riff48Khz16BitMonoPcm);
         var boundaries = new List<(string Text, bool IsWord, TimeSpan Start, TimeSpan Length)>();
 

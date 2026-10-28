@@ -7,8 +7,11 @@ namespace PoAutoRobo.Core.Library;
 /// <param name="Endpoint">The Azure AI services resource. One resource serves script, voice, images and video.</param>
 public sealed record AppSettings(Uri? Endpoint, string? GitHubToken)
 {
-    /// <summary>The account signed in with <c>az login</c>. Asking only the CLI is much quicker than trying every sign-in source in turn.</summary>
-    public static readonly TokenCredential SignedInUser = new AzureCliCredential();
+    /// <summary>
+    /// The account signed in with <c>az login</c>. Asking only the CLI is much quicker than trying every sign-in source in
+    /// turn. Given longer than its standard 13 seconds: a cold start of the CLI, beside the other services asking too, can take that.
+    /// </summary>
+    public static readonly TokenCredential SignedInUser = new AzureCliCredential(new AzureCliCredentialOptions { ProcessTimeout = TimeSpan.FromSeconds(30) });
 
     public static readonly AppSettings Offline = new(null, null);
 
