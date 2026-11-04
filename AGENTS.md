@@ -30,8 +30,9 @@ Where this file and `CLAUDE.md` disagree about the code, `CLAUDE.md` wins.
 ## 4. UI changes and reporting
 
 - **Before and after.** For a change to what the window shows, capture the old and the new state, mark what changed,
-  save it as `SCREENSHOTS/YYMMDD-feature-name.html` and give its full path. The folder stays on this computer and out
-  of the repository (`.gitignore`): its pictures are large and only matter on the day.
+  save it as `SCREENSHOTS/YYMMDD-feature-name.html` and give its full path. Also put the before and the after side by
+  side in a single PNG, with notes on what changed, beside it as `SCREENSHOTS/YYMMDD-feature-name.png`. The folder
+  stays on this computer and out of the repository (`.gitignore`): its pictures are large and only matter on the day.
 - **Build version.** The window shows the build version, `YYMMDD commit` (a `+` after the commit means changes not
   yet committed), in its bottom-right corner. It is stamped at build time from the last commit (today's date alone
   when git is not available); see `StampBuildVersion` in
