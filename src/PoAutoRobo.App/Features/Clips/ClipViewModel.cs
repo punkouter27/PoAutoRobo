@@ -19,7 +19,7 @@ public partial class ClipViewModel(Clip clip, Action<Func<Episode, Episode>> edi
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Title), nameof(Heading), nameof(Summary), nameof(Warnings), nameof(TierIndex), nameof(OffStandardTier), nameof(HostVisible), nameof(Dialogue), nameof(Pose), nameof(VisualPrompt),
-        nameof(IsStale), nameof(StaleWarning), nameof(LengthWarning), nameof(HasUserVideo), nameof(OwnSound), nameof(RobotView), nameof(CanPickKind), nameof(KindIndex), nameof(ThumbnailPath), nameof(EarlierTakes), nameof(HasEarlierTakes))]
+        nameof(IsStale), nameof(StaleWarning), nameof(LengthWarning), nameof(HasUserVideo), nameof(OwnSound), nameof(RobotView), nameof(CanPickKind), nameof(KindIndex), nameof(KindByHand), nameof(ThumbnailPath), nameof(EarlierTakes), nameof(HasEarlierTakes))]
     public partial Clip Clip { get; set; } = clip;
 
     [ObservableProperty]
@@ -123,6 +123,9 @@ public partial class ClipViewModel(Clip clip, Action<Func<Episode, Episode>> edi
     public bool HasEarlierTakes => EarlierTakes.Count > 0;
 
     public bool CanPickKind => !HasUserVideo;
+
+    /// <summary>The picture type was set by hand, so its control stays in view without advanced controls.</summary>
+    public bool KindByHand => Clip.Visual.KindLocked && !HasUserVideo;
 
     /// <summary>Picture type as the inspector's list shows it; -1 for a kind that is not in the list.</summary>
     public int KindIndex

@@ -109,7 +109,7 @@
                     <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Style="{StaticResource QuietText}"
                                Text="{x:Bind ViewModel.SelectedClip.Pose, Mode=OneWay}" ToolTipService.ToolTip="What the host is doing in this clip&#39;s picture, taken from the subject." />
                 </Grid>
-                <ComboBox x:Name="KindBox" Visibility="{x:Bind ViewModel.Advanced, Mode=OneWay}" ToolTipService.ToolTip="Set this clip&#39;s picture type yourself. A clip set by hand keeps its type when the visual mix changes." Header="Picture type"
+                <ComboBox x:Name="KindBox" Visibility="{x:Bind app:Ui.ShowEither(ViewModel.Advanced, ViewModel.SelectedClip.KindByHand), Mode=OneWay}" ToolTipService.ToolTip="Set this clip&#39;s picture type yourself. A clip set by hand keeps its type when the visual mix changes." Header="Picture type"
                           HorizontalAlignment="Stretch" IsEnabled="{x:Bind ViewModel.SelectedClip.CanPickKind, Mode=OneWay}"
                           ItemsSource="{x:Bind vm:ClipViewModel.KindChoices}" SelectedIndex="{x:Bind ViewModel.SelectedClip.KindIndex, Mode=TwoWay}" />
                 <!-- Make it, or make it again a different way -->
@@ -143,7 +143,7 @@
                               IsOn="{x:Bind ViewModel.SelectedClip.OwnSound, Mode=OneWay}" Toggled="OnOwnSoundToggled" Visibility="{x:Bind ViewModel.SelectedClip.HasUserVideo, Mode=OneWay}"
                               ToolTipService.ToolTip="My sound keeps what the camera heard; any words in the box above become its captions. Narrate rewrites the words to fit the film and records them, which takes a moment." />
                 <ToggleSwitch x:Name="RobotViewSwitch" Header="Look" OnContent="Robot's eyes: depth colours, traced edges and a readout" OffContent="As filmed"
-                              IsOn="{x:Bind ViewModel.SelectedClip.RobotView, Mode=OneWay}" Toggled="OnRobotViewToggled" Visibility="{x:Bind app:Ui.ShowBoth(ViewModel.Advanced, ViewModel.SelectedClip.HasUserVideo), Mode=OneWay}"
+                              IsOn="{x:Bind ViewModel.SelectedClip.RobotView, Mode=OneWay}" Toggled="OnRobotViewToggled" Visibility="{x:Bind app:Ui.ShowEitherIf(ViewModel.Advanced, ViewModel.SelectedClip.RobotView, ViewModel.SelectedClip.HasUserVideo), Mode=OneWay}"
                               ToolTipService.ToolTip="Show the film as the R1's own camera might see it, with the beat and the clip's title in its readout. A film from the beat where it went wrong also glitches. Drawn here, so it costs nothing." />
                 <Button x:Name="RemoveVideoButton" Content="Use a generated picture instead" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.RemoveVideoCommand}"
                         Visibility="{x:Bind app:Ui.ShowBoth(ViewModel.Advanced, ViewModel.SelectedClip.HasUserVideo), Mode=OneWay}"

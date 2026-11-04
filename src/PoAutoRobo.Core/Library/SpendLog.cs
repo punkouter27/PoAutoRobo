@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace PoAutoRobo.Core.Library;
 
@@ -11,7 +12,7 @@ public sealed record SpendLine(string What, decimal Dollars, int Units);
 /// the app's own price list; script and voice calls are priced when the user has given their rates, and are otherwise
 /// listed by how much they used.
 /// </summary>
-public static class SpendLog
+public static partial class SpendLog
 {
     public const string FileName = "spend.jsonl";
 
@@ -27,13 +28,16 @@ public static class SpendLog
 
     private sealed record Entry(DateTimeOffset When, string What, decimal Dollars, int Units = 0);
 
+    [JsonSerializable(typeof(Entry))]
+    private sealed partial class EntryJson : JsonSerializerContext;
+
     /// <param name="units">How much was used: tokens, characters. Zero when the line is a price alone.</param>
     public static void Add(string folder, string what, decimal dollars, int units = 0)
     {
         lock (Gate)
         {
             Directory.CreateDirectory(folder);
-            File.AppendAllText(Path.Combine(folder, FileName), JsonSerializer.Serialize(new Entry(DateTimeOffset.Now, what, dollars, units)) + "\n");
+            File.AppendAllText(Path.Combine(folder, FileName), JsonSerializer.Serialize(new Entry(DateTimeOffset.Now, what, dollars, units), EntryJson.Default.Entry) + "\n");
         }
     }
 
@@ -80,7 +84,7 @@ public static class SpendLog
     {
         try
         {
-            return JsonSerializer.Deserialize<Entry>(line);
+            return JsonSerializer.Deserialize(line, EntryJson.Default.Entry);
         }
         catch (JsonException)
         {

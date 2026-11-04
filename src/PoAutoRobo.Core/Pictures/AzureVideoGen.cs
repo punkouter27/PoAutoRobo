@@ -1,6 +1,6 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PoAutoRobo.Core.Pictures;
 
@@ -51,7 +51,7 @@ public sealed class AzureVideoGen(AppSettings settings, HttpClient http, string 
 
     private async Task<JsonElement> BeginAsync(string prompt, string note, CancellationToken ct)
     {
-        var job = (await JsonAsync(HttpMethod.Post, "", () => JsonContent.Create(new { model = settings.VideoDeployment, prompt, size = "1280x720", seconds = $"{Seconds}" }), false, ct))!.Value;
+        var job = (await JsonAsync(HttpMethod.Post, "", () => new StringContent(new JsonObject { ["model"] = settings.VideoDeployment, ["prompt"] = prompt, ["size"] = "1280x720", ["seconds"] = $"{Seconds}" }.ToJsonString(), System.Text.Encoding.UTF8, "application/json"), false, ct))!.Value;
         Directory.CreateDirectory(jobsFolder);
         await File.WriteAllTextAsync(note, Id(job), CancellationToken.None); // it is paid for now, whatever happens next
         return job;

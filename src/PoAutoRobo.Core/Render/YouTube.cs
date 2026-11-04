@@ -134,7 +134,7 @@ public sealed class YouTube(string clientId, string clientSecret, SendHttp send)
         var tags = new JsonArray();
         var room = MaxTags;
         foreach (var tag in details.Tags.Select(Clean).Where(t => t.Length > 0))
-            if ((room -= tag.Length + 1) >= 0) tags.Add(tag);
+            if ((room -= tag.Length + 1) >= 0) tags.Add((JsonNode)JsonValue.Create(tag));
         var status = new JsonObject
         {
             ["privacyStatus"] = (details.PublishAt is null ? details.Privacy : Privacy.Private).ToString().ToLowerInvariant(),

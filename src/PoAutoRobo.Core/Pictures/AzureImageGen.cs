@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PoAutoRobo.Core.Pictures;
 
@@ -48,10 +49,17 @@ public sealed class AzureImageGen(AppSettings settings, HttpClient http)
 
     // Written out whole rather than streamed, so its length goes with it: FLUX turns a request away without one.
     // Without a quality (FLUX) the request names no quality, count or background either.
-    private static StringContent Json(ImageRequest request, string? quality) => new(JsonSerializer.Serialize<object>(
-        quality is null ? new { prompt = request.Prompt, size = request.Size }
-        : request.Transparent ? new { prompt = request.Prompt, size = request.Size, quality, n = 1, background = "transparent" }
-        : new { prompt = request.Prompt, size = request.Size, quality, n = 1 }), System.Text.Encoding.UTF8, "application/json");
+    private static StringContent Json(ImageRequest request, string? quality)
+    {
+        var body = new JsonObject { ["prompt"] = request.Prompt, ["size"] = request.Size };
+        if (quality is not null)
+        {
+            body["quality"] = quality;
+            body["n"] = 1;
+            if (request.Transparent) body["background"] = "transparent";
+        }
+        return new(body.ToJsonString(), System.Text.Encoding.UTF8, "application/json");
+    }
 
     private static MultipartFormDataContent Form(ImageRequest request, string? quality, byte[] reference)
     {

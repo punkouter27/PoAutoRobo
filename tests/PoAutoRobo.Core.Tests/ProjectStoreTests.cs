@@ -43,6 +43,17 @@ public sealed class ProjectStoreTests : IDisposable
         Assert.Equal(1.05, reopened.Clips[1].NarrationRate);
         Assert.True(reopened.Clips[0].Visual.Stale);
         Assert.Equal(Tier.B, Assert.Single(reopened.Clips[3].Scripts).Key);
+
+        // A file saved before later fields existed keeps their defaults, not zero or nothing.
+        File.WriteAllText(Path.Combine(_folder, ProjectStore.FileName), """
+            { "Title": "t", "Topic": "t", "MixSeed": 1, "Clips": [ { "Id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301", "Title": "x", "ActiveTier": "B",
+              "Scripts": { "B": { "Dialogue": "a", "VisualPrompt": "p", "Pose": "p" } }, "Visual": { "Kind": "Still" }, "HostVisible": true } ] }
+            """);
+        var older = ProjectStore.Load(_folder);
+        Assert.Equal((1.0, new CaptionStyle(), MixPercentages.Default, 0), (older.Clips[0].NarrationRate, older.Captions, older.Mix, older.Shots.Count));
+        File.WriteAllText(Path.Combine(_folder, SeriesKit.FileName), "{}");
+        var kit = SeriesKit.Load(_folder);
+        Assert.Equal((15, new CaptionStyle(), ""), (kit.OutroSeconds, kit.Captions, kit.ChannelName));
     }
 
     [Fact]

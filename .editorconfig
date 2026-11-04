@@ -32,6 +32,15 @@ dotnet_diagnostic.CA1861.severity = none       # inline arrays in one-off calls 
 dotnet_diagnostic.CA1859.severity = none       # command methods must return plain Task whatever they hand back inside
 dotnet_diagnostic.CA2007.severity = none       # ConfigureAwait: a UI app wants its continuations back on the UI thread
 
+# Code that is never used. Not in the app project: its event handlers are wired up by its XAML, which the formatter
+# cannot see, so it would call them unused.
+[{src/PoAutoRobo.Core/**.cs,tests/**.cs}]
+dotnet_diagnostic.IDE0051.severity = warning   # private member never used
+dotnet_diagnostic.IDE0052.severity = warning   # private member written but never read
+dotnet_diagnostic.IDE0060.severity = warning   # parameter never used
+dotnet_diagnostic.IDE0059.severity = warning   # value assigned and never read
+dotnet_diagnostic.CA1823.severity = warning    # field never used
+
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none       # test names are sentences joined by underscores
 dotnet_diagnostic.CA1310.severity = none       # tests compare plain ASCII they wrote themselves

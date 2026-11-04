@@ -3,7 +3,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using PoAutoRobo.App.ViewModels;
-using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.Storage.Pickers;
 
@@ -40,8 +39,8 @@ public sealed partial class IntroPage : UserControl
     /// <summary>Lets go of the video being shown, so the scratch sweep can remove it. The window calls this as it closes.</summary>
     public void Release()
     {
-        _player.Dispose();
-        _listen.Dispose();
+        Ui.Close(_player);
+        Ui.Close(_listen);
     }
 
     // A new still takes the screen as soon as it is drawn, as the last change asked for it; a new intro or outro plays
@@ -69,7 +68,7 @@ public sealed partial class IntroPage : UserControl
         {
             IntroPlayer.Visibility = Visibility.Visible;
             StillBadge.Visibility = Visibility.Collapsed;
-            _player.Source = MediaSource.CreateFromUri(new Uri(made));
+            Ui.Play(_player, made);
             _player.Play();
         }
         else if (e.PropertyName == nameof(MainViewModel.ShowIntro) && ViewModel?.ShowIntro == false)
@@ -131,7 +130,7 @@ public sealed partial class IntroPage : UserControl
         StopListening();
         if (again || await ViewModel.BookendSoundAsync(role == "sting") is not { } sound) return;
         _player.Pause(); // the intro or outro video, if one is playing
-        _listen.Source = MediaSource.CreateFromUri(new Uri(sound));
+        Ui.Play(_listen, sound);
         _listen.Play();
         _listening = role;
         (role == "sting" ? StingPlayIcon : MusicPlayIcon).Symbol = Symbol.Stop;

@@ -10,7 +10,6 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using PoAutoRobo.App.ViewModels;
 using Windows.Foundation;
-using Windows.Media.Core;
 using Windows.Media.Playback;
 using Windows.UI;
 
@@ -36,6 +35,9 @@ public sealed partial class TimelineView : UserControl
         ("Orange", Color.FromArgb(255, 249, 115, 22)), ("Red", Color.FromArgb(255, 239, 68, 68)), ("Violet", Color.FromArgb(255, 168, 85, 247)),
         ("Pink", Color.FromArgb(255, 236, 72, 153)), ("White", Color.FromArgb(255, 255, 255, 255)),
     ];
+
+    /// <summary>Any colour is an advanced control, kept in view while the accent is one of its own picks, not a swatch.</summary>
+    public static Visibility ShowAnyColour(bool advanced, Color accent) => Ui.ShowEither(advanced, !Accents.Any(a => a.Colour == accent));
 
     public TimelineView()
     {
@@ -174,7 +176,7 @@ public sealed partial class TimelineView : UserControl
         _length = TimeSpan.Zero;
         if (preview is not null)
         {
-            _player.Source = MediaSource.CreateFromUri(new Uri(preview.VideoPath));
+            Ui.Play(_player, preview.VideoPath);
             _player.PlaybackSession.PlaybackRate = 1; // a new preview starts at normal speed, whatever L left it at
             _ = LoadWaveAsync(preview.Marks);
         }
@@ -212,7 +214,7 @@ public sealed partial class TimelineView : UserControl
     private void Release()
     {
         _player.Pause();
-        _player.Source = null;
+        Ui.Play(_player, null);
         ShowPlaying();
     }
 
@@ -337,6 +339,6 @@ public sealed partial class TimelineView : UserControl
         _tick.Stop();
         Overlay.RemoveFromVisualTree(); // Win2D controls must be detached explicitly or they leak
         Wave.RemoveFromVisualTree();
-        _player.Dispose();
+        Ui.Close(_player);
     }
 }

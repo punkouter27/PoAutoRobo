@@ -1,5 +1,6 @@
-using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PoAutoRobo.Core.Script;
 
@@ -11,15 +12,22 @@ public static class LocalChat
 {
     public static JsonChat Create(Uri baseAddress, HttpClient http) => async (model, system, user, schemaName, schema, _, ct) =>
     {
-        using var shape = JsonDocument.Parse(schema);
-        using var response = await http.PostAsJsonAsync(new Uri(baseAddress, "chat/completions"), new
+        var request = new JsonObject
         {
-            model,
-            stream = false,
-            messages = new object[] { new { role = "system", content = system }, new { role = "user", content = user } },
+            ["model"] = model,
+            ["stream"] = false,
+            ["messages"] = new JsonArray(
+                new JsonObject { ["role"] = "system", ["content"] = system },
+                new JsonObject { ["role"] = "user", ["content"] = user }),
             // Held to the schema by the runtime, as the hosted model is.
-            response_format = new { type = "json_schema", json_schema = new { name = schemaName, strict = true, schema = shape.RootElement } },
-        }, ct);
+            ["response_format"] = new JsonObject
+            {
+                ["type"] = "json_schema",
+                ["json_schema"] = new JsonObject { ["name"] = schemaName, ["strict"] = true, ["schema"] = JsonNode.Parse(schema) },
+            },
+        };
+        using var body = new StringContent(request.ToJsonString(), Encoding.UTF8, "application/json");
+        using var response = await http.PostAsync(new Uri(baseAddress, "chat/completions"), body, ct);
         response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         var text = json.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";

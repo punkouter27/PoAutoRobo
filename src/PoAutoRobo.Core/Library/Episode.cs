@@ -29,7 +29,8 @@ public sealed record Clip(
     Tier ActiveTier,
     IReadOnlyDictionary<Tier, TierScript> Scripts,
     VisualSpec Visual,
-    bool HostVisible)
+    bool HostVisible,
+    double NarrationRate = 1.0)
 {
     public TierScript Active => Scripts[ActiveTier];
 
@@ -57,7 +58,7 @@ public sealed record Clip(
     public static string HeardFor(string videoPath) => Path.ChangeExtension(videoPath, ".heard.json");
 
     /// <summary>Speaking pace multiplier; moves off 1.0 only to fit narration to the user's footage.</summary>
-    public double NarrationRate { get; init; } = 1.0;
+    public double NarrationRate { get; init; } = NarrationRate;
 
     /// <summary>The name of the beat the clip belongs to; null for clips written before episodes had beats.</summary>
     public string? Beat { get; init; }
@@ -84,13 +85,18 @@ public sealed record MixPercentages(int Still, int MultiPanel, int TitleCard)
     public static readonly MixPercentages Default = new(60, 25, 15);
 }
 
+// Fields added after the first save are optional parameters, not properties with a value of their own: the JSON code
+// written at build time sets every init property, and one missing from an older file would lose its default.
 public sealed record Episode(
     string Title,
     string Topic,
     IReadOnlyList<Clip> Clips,
-    int MixSeed)
+    int MixSeed,
+    CaptionStyle? Captions = null,
+    MixPercentages? Mix = null,
+    IReadOnlyList<Shot>? Shots = null)
 {
-    public CaptionStyle Captions { get; init; } = new();
+    public CaptionStyle Captions { get; init; } = Captions ?? new();
 
     /// <summary>Where the episode comes in the series, from 1; 0 for episodes saved before they were numbered.</summary>
     public int Number { get; init; }
@@ -98,7 +104,7 @@ public sealed record Episode(
     /// <summary>The shape the episode is told in. Episodes saved before there was a choice are stories.</summary>
     public BeatStructure Structure { get; init; }
 
-    public MixPercentages Mix { get; init; } = MixPercentages.Default;
+    public MixPercentages Mix { get; init; } = Mix ?? MixPercentages.Default;
 
     /// <summary>Episodes saved before there was a choice have no value here and are comic-book episodes.</summary>
     public Look Look { get; init; }
@@ -113,7 +119,7 @@ public sealed record Episode(
     public string? Subject { get; init; }
 
     /// <summary>The shots planned for filming the lesson, as ticked off; empty when none were asked for.</summary>
-    public IReadOnlyList<Shot> Shots { get; init; } = [];
+    public IReadOnlyList<Shot> Shots { get; init; } = Shots ?? [];
 
     /// <summary>The first picture any clip has on disk, used as the episode's thumbnail; null when there is none.</summary>
     public string? Cover() => Clips.Select(clip => clip.Picture()).FirstOrDefault(path => path is not null);

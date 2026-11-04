@@ -20,11 +20,17 @@ public static class ProjectStore
 {
     public const string FileName = "episode.json";
 
-    public static readonly JsonSerializerOptions JsonOptions = new()
+    // Enums are saved as their names, one converter for each kind an episode or the brand kit holds.
+    public static readonly JsonSerializerOptions JsonOptions = Json.Knowing(new()
     {
         WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
-    };
+        Converters =
+        {
+            new JsonStringEnumConverter<BeatStructure>(), new JsonStringEnumConverter<Show>(), new JsonStringEnumConverter<CaptionPreset>(),
+            new JsonStringEnumConverter<Tier>(), new JsonStringEnumConverter<VisualKind>(), new JsonStringEnumConverter<Look>(),
+            new JsonStringEnumConverter<IntroLayout>(),
+        },
+    });
 
     // A saved episode with a field missing or null fails to read, and is reported as damaged.
     private static readonly JsonSerializerOptions Strict = new(JsonOptions)
@@ -38,7 +44,7 @@ public static class ProjectStore
         Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, FileName);
         var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(episode, JsonOptions));
+        File.WriteAllText(temp, Json.Write(episode, JsonOptions));
         if (File.Exists(path))
             File.Replace(temp, path, path + ".bak");
         else
@@ -163,7 +169,7 @@ public static class ProjectStore
 
     /// <summary>Keeps the passages a script was written from beside the episode, so they can be shown and checked against later.</summary>
     public static void SaveSnippets(IReadOnlyList<GroundingSnippet> snippets, string folder) =>
-        File.WriteAllText(Path.Combine(folder, SnippetsFile), JsonSerializer.Serialize(snippets, JsonOptions));
+        File.WriteAllText(Path.Combine(folder, SnippetsFile), Json.Write(snippets, JsonOptions));
 
     /// <summary>The saved passages with web links only; none when the file is absent or unreadable.</summary>
     public static IReadOnlyList<GroundingSnippet> LoadSnippets(string folder) =>
@@ -237,7 +243,7 @@ public static class ProjectStore
     {
         try
         {
-            var episode = JsonSerializer.Deserialize<Episode>(File.ReadAllText(path), Strict)
+            var episode = Json.Read<Episode>(File.ReadAllText(path), Strict)
                 ?? throw new InvalidDataException($"{path} is empty.");
             CheckShape(episode, path);
             return KeepOwnMedia(episode, folder);

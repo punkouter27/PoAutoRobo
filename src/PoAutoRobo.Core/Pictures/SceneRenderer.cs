@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PoAutoRobo.Core.Pictures;
 
@@ -79,14 +80,14 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
             // One request, then replies are read until the one that answers it; anything else is the browser's news.
             // Each has a time limit of its own: a page whose code froze it between frames (a loop queued to run later)
             // never answers, and the frame's own limit does not reach that far.
-            async Task<JsonElement> Call(string method, object parameters)
+            async Task<JsonElement> Call(string method, JsonObject parameters)
             {
                 var id = ++lastId;
                 using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 limit.CancelAfter(2 * FrameTimeout);
                 try
                 {
-                    await socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(new { id, method, @params = parameters }), WebSocketMessageType.Text, true, limit.Token);
+                    await socket.SendAsync(System.Text.Encoding.UTF8.GetBytes(new JsonObject { ["id"] = id, ["method"] = method, ["params"] = parameters }.ToJsonString()), WebSocketMessageType.Text, true, limit.Token);
                     while (true)
                     {
                         using var message = new MemoryStream();
@@ -115,7 +116,7 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
             // would then be pictured in the video. Each frame is checked to be the scene's own page after it is taken.
             async Task StillTheScene()
             {
-                var tree = await Call("Page.getFrameTree", new { });
+                var tree = await Call("Page.getFrameTree", []);
                 if (!Uri.TryCreate(tree.GetProperty("frameTree").GetProperty("frame").GetProperty("url").GetString(), UriKind.Absolute, out var shown)
                     || !shown.IsFile || !string.Equals(shown.LocalPath, page, StringComparison.OrdinalIgnoreCase))
                     throw new SceneCodeException("The code tried to leave its page, which is not allowed.");
@@ -126,7 +127,7 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
                 JsonElement reply;
                 try
                 {
-                    reply = await Call("Runtime.evaluate", new { expression, returnByValue = true, timeout = FrameTimeout });
+                    reply = await Call("Runtime.evaluate", new() { ["expression"] = expression, ["returnByValue"] = true, ["timeout"] = FrameTimeout });
                 }
                 catch (InvalidOperationException)
                 {
@@ -138,8 +139,8 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
                 return reply.GetProperty("result");
             }
 
-            await Call("Emulation.setDeviceMetricsOverride", new { width = Width, height = Height, deviceScaleFactor = 1, mobile = false });
-            await Call("Page.navigate", new { url = new Uri(page).AbsoluteUri });
+            await Call("Emulation.setDeviceMetricsOverride", new() { ["width"] = Width, ["height"] = Height, ["deviceScaleFactor"] = 1, ["mobile"] = false });
+            await Call("Page.navigate", new() { ["url"] = new Uri(page).AbsoluteUri });
             for (var tries = 0; ; tries++)
             {
                 var ready = await Run("document.readyState === 'complete' ? typeof render === 'function' : null");
@@ -161,7 +162,7 @@ public sealed class SceneRenderer(string browserPath, FfmpegRunner ffmpeg)
             for (var frame = 0; frame < frames; frame++)
             {
                 await Run(FormattableString.Invariant($"render({(double)frame / Fps:0.####}, {length.TotalSeconds:0.###})"));
-                var shot = await Call("Page.captureScreenshot", new { format = "jpeg", quality = 92 });
+                var shot = await Call("Page.captureScreenshot", new() { ["format"] = "jpeg", ["quality"] = 92 });
                 await StillTheScene();
                 await File.WriteAllBytesAsync(Path.Combine(work, $"f{frame:00000}.jpg"), shot.GetProperty("data").GetBytesFromBase64(), ct);
             }

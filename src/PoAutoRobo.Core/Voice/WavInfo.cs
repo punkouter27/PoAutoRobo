@@ -7,11 +7,21 @@ public static class WavInfo
     public static TimeSpan Duration(string path)
     {
         using var reader = new BinaryReader(File.OpenRead(path));
+        var (byteRate, _, _, bytes) = Layout(reader, path);
+        return TimeSpan.FromSeconds((double)bytes / byteRate);
+    }
+
+    /// <summary>
+    /// Walks the file's chunks to its sound: the bytes a second and bits in a sample from the format block, and where
+    /// the samples start and how many bytes of them there are.
+    /// </summary>
+    private static (int ByteRate, int Bits, long Data, long Bytes) Layout(BinaryReader reader, string path)
+    {
         var length = reader.BaseStream.Length;
         if (length < 12 || Tag(reader) != "RIFF" || reader.ReadInt32() < 0 || Tag(reader) != "WAVE")
             throw new InvalidDataException($"{path} is not a WAV file.");
 
-        var byteRate = 0;
+        var (byteRate, bits) = (0, 0);
         while (reader.BaseStream.Position + 8 <= length)
         {
             var id = Tag(reader);
@@ -20,13 +30,15 @@ public static class WavInfo
             {
                 reader.BaseStream.Seek(8, SeekOrigin.Current);
                 byteRate = reader.ReadInt32();
-                reader.BaseStream.Seek(size - 12, SeekOrigin.Current);
+                reader.BaseStream.Seek(2, SeekOrigin.Current);
+                bits = reader.ReadInt16();
+                reader.BaseStream.Seek(size - 16, SeekOrigin.Current);
             }
             else if (id == "data" && byteRate > 0)
             {
                 // Streamed writers can leave a wrong size here, so never trust it past the end of the file.
-                var bytes = Math.Min(size, length - reader.BaseStream.Position);
-                return TimeSpan.FromSeconds((double)bytes / byteRate);
+                var data = reader.BaseStream.Position;
+                return (byteRate, bits, data, Math.Min(size, length - data));
             }
             else
             {
@@ -42,13 +54,23 @@ public static class WavInfo
     /// </summary>
     public static float[] Peaks(string path, int count)
     {
-        var bytes = File.ReadAllBytes(path);
-        // ponytail: looks for the first "data" tag instead of walking the chunks. A WAV with that word in an earlier
-        // chunk would draw a wrong waveform; walk the chunks as Duration does if that ever happens.
-        var data = bytes.AsSpan().IndexOf("data"u8);
-        if (count <= 0 || bytes.Length < 44 || BitConverter.ToInt16(bytes, 34) != 16 || data < 0)
+        if (count <= 0)
             return [];
-        var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(bytes.AsSpan(data + 8, (bytes.Length - data - 8) & ~1));
+        var bytes = File.ReadAllBytes(path);
+        int bits;
+        long data, size;
+        try
+        {
+            using var reader = new BinaryReader(new MemoryStream(bytes));
+            (_, bits, data, size) = Layout(reader, path);
+        }
+        catch (Exception e) when (e is InvalidDataException or EndOfStreamException or IOException)
+        {
+            return [];
+        }
+        if (bits != 16 || size < 2)
+            return [];
+        var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(bytes.AsSpan((int)data, (int)size & ~1));
         var peaks = new float[count];
         for (var i = 0; i < samples.Length; i++)
         {

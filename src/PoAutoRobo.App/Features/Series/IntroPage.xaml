@@ -148,7 +148,7 @@
                 </ItemsControl>
 
                 <!-- The host: the cartoon robot in every episode's pictures, chosen once so the character always looks the same -->
-                <StackPanel Spacing="{StaticResource Gap}" Visibility="{x:Bind ViewModel.Advanced, Mode=OneWay}">
+                <StackPanel Spacing="{StaticResource Gap}" Visibility="{x:Bind app:Ui.ShowEither(ViewModel.Advanced, ViewModel.HasHostDesign), Mode=OneWay}">
                     <TextBlock Text="Host" Style="{StaticResource SectionHeading}" />
                     <TextBlock Style="{StaticResource QuietText}" TextWrapping="Wrap"
                                Text="The cartoon robot that presents every episode. Pick one design and every new picture keeps it, so the character always looks the same." />

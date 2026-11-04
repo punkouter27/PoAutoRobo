@@ -23,7 +23,7 @@ public sealed partial class EpisodeBuilder
             if (File.Exists(audio) && File.Exists(words))
                 try
                 {
-                    if (JsonSerializer.Deserialize<List<WordTiming>>(await File.ReadAllTextAsync(words, ct)) is { } timings)
+                    if (Json.Read<List<WordTiming>>(await File.ReadAllTextAsync(words, ct)) is { } timings)
                         return new Narration(audio, WavInfo.Duration(audio), timings);
                 }
                 catch (Exception e) when (e is JsonException or InvalidDataException)
@@ -42,7 +42,7 @@ public sealed partial class EpisodeBuilder
                 if (PaceLearned is { } learned && clip.NarrationRate == 1.0 && Durations.Learned(Durations.WordsPerMinute, text, narration.Duration) is { } pace)
                     learned(Durations.WordsPerMinute = pace);
             }
-            await File.WriteAllTextAsync(words, JsonSerializer.Serialize(narration.Words), ct);
+            await File.WriteAllTextAsync(words, Json.Write(narration.Words), ct);
             return narration;
         }
         finally
@@ -86,7 +86,7 @@ public sealed partial class EpisodeBuilder
     {
         try
         {
-            var heard = JsonSerializer.Deserialize<List<WordTiming>>(File.ReadAllText(Clip.HeardFor(film)));
+            var heard = Json.Read<List<WordTiming>>(File.ReadAllText(Clip.HeardFor(film)));
             var typed = Durations.SplitWords(text);
             return heard is { Count: > 0 } && heard.Count == typed.Length
                 ? [.. heard.Select((w, i) => w with { Text = typed[i] }).Where(w => w.Start < length)]

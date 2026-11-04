@@ -40,7 +40,6 @@
                         <Setter Target="Commands.DefaultLabelPosition" Value="Collapsed" />
                         <Setter Target="InspectorColumn.Width" Value="300" />
                         <Setter Target="PreviewColumn.Width" Value="240" />
-                        <Setter Target="PublishColumn.Width" Value="240" />
                     </VisualState.Setters>
                 </VisualState>
                 <!-- Narrower still: the same, and the step's checklist and its button drop to a line of their own under the steps. -->
@@ -52,7 +51,6 @@
                         <Setter Target="Commands.DefaultLabelPosition" Value="Collapsed" />
                         <Setter Target="InspectorColumn.Width" Value="280" />
                         <Setter Target="PreviewColumn.Width" Value="220" />
-                        <Setter Target="PublishColumn.Width" Value="240" />
                         <Setter Target="GuideList.(Grid.Row)" Value="1" />
                         <Setter Target="GuideList.(Grid.Column)" Value="0" />
                         <Setter Target="GuideList.(Grid.ColumnSpan)" Value="2" />
@@ -124,7 +122,7 @@
                                   ToolTipService.ToolTip="Save a second copy of the open episode, with every picture and recording, to try something different without touching this one. It is numbered as the next in the series. Nothing is paid for again." />
                     <AppBarButton x:Name="ShowEpisodeItem" Icon="Folder" Label="Show in File Explorer" Command="{x:Bind ViewModel.ShowOpenEpisodeCommand}"
                                   ToolTipService.ToolTip="Open the episode's folder, with its script, voices, pictures and finished videos, in File Explorer." />
-                    <AppBarButton x:Name="CleanMediaItem" Label="Remove unused media…" Command="{x:Bind ViewModel.CleanMediaCommand}"
+                    <AppBarButton x:Name="CleanMediaItem" Label="Remove unused media…" Command="{x:Bind ViewModel.CleanMediaCommand}" Visibility="{x:Bind ViewModel.Advanced, Mode=OneWay}"
                                   ToolTipService.ToolTip="Frees space by deleting pictures, voices and films in the episode's folder that no clip uses any more, such as old takes. You are shown what goes first." />
                     <AppBarSeparator />
                     <AppBarButton x:Name="DeleteEpisodeItem" Icon="Delete" Label="Delete episode…" Command="{x:Bind ViewModel.DeleteOpenEpisodeCommand}"
@@ -256,8 +254,6 @@
                             <Button x:Name="FinalPicturesButton" Content="Make final pictures" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.MakeFinalPicturesCommand}"
                                     ToolTipService.ToolTip="Draws every draft picture again at full quality, from the same description, for the master video. You are shown the cost and asked first. Make the preview again afterwards to watch them." />
                         </StackPanel>
-                        <TextBlock Text="Captions" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                        <TextBlock Style="{StaticResource QuietText}" Text="Set on the preview itself: Aa, in its top corner. The words show the new style as you change it, and new episodes start with the style picked last." />
 
                         <!-- This episode's own: the series' outro music, its default, is set on the Series step -->
                         <TextBlock Text="This episode's outro music" Style="{StaticResource SectionHeading}" />
@@ -275,140 +271,13 @@
                                 <SymbolIcon Symbol="Cancel" />
                             </Button>
                         </Grid>
-                        <TextBlock Style="{StaticResource QuietText}" Text="Music plays only over the intro and outro, never under the clips. A change to it, or to a clip, shows in the next preview." />
+                        <TextBlock Style="{StaticResource QuietText}" Text="A change to the music, or to a clip, shows in the next preview." />
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
 
             <!-- Step 5 · Publish: the teasers, ten-second upright cuts for other sites, as cards; the finished videos beside them -->
-            <Grid x:Name="PublishPage" Padding="{StaticResource PagePadding}" ColumnSpacing="{StaticResource GapLarge}" Visibility="{x:Bind ViewModel.ShowPublish, Mode=OneWay}">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition x:Name="PublishColumn" Width="{StaticResource ExportColumn}" />
-                </Grid.ColumnDefinitions>
-                <Grid RowSpacing="{StaticResource Gap}">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Text="Teasers" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                    <TextBlock Grid.Row="1" Style="{StaticResource QuietText}"
-                               Text="Optional: three ten-second upright cuts of this episode for other video sites. Suggest them, change a hook, untick the ones you do not want, then render the rest." />
-                    <!-- The teasers' own buttons, in the order they are used -->
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
-                        <Button x:Name="SuggestTeasersButton" Command="{x:Bind ViewModel.SuggestTeasersCommand}" AutomationProperties.Name="Suggest teasers"
-                                ToolTipService.ToolTip="Three ten-second upright cuts of this episode for other video sites, each a hook over one to three moments. One quick request to the script service.">
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
-                                <FontIcon Glyph="&#xE82F;" FontSize="16" />
-                                <TextBlock Text="Suggest teasers" />
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="RenderTeasersButton" Content="{x:Bind ViewModel.RenderTeasersLabel, Mode=OneWay}" Command="{x:Bind ViewModel.RenderTeasersCommand}"
-                                Visibility="{x:Bind ViewModel.HasTeasers, Mode=OneWay}"
-                                ToolTipService.ToolTip="Builds each kept teaser as a 1080 by 1920 video in the episode's export folder, from the clips already made. Nothing new is paid for." />
-                        <Border Visibility="{x:Bind ViewModel.HasTeasers, Mode=OneWay}"
-                                ToolTipService.ToolTip="Send each rendered teaser to your channel as a YouTube Short, titled with its hook and #Shorts, as private, unlisted or public as chosen for the finished video. Free. TikTok is not offered: its posting API only works for apps TikTok has approved.">
-                            <Button Content="Upload as Shorts" Command="{x:Bind ViewModel.UploadShortsCommand}" />
-                        </Border>
-                    </StackPanel>
-                    <!-- The cards wrap to the room there is and scroll down, never sideways -->
-                    <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Visibility="{x:Bind ViewModel.HasTeasers, Mode=OneWay}">
-                            <ItemsControl x:Name="TeaserCardList" ItemsSource="{x:Bind ViewModel.TeaserCards}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <ItemsWrapGrid Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:TeaserViewModel">
-                                        <Border Width="{StaticResource TeaserCardWidth}" Margin="0,0,12,12" CornerRadius="10" Padding="10" Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                            <Grid ColumnSpacing="10">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <!-- Upright, as on a phone: the opening clip's picture cropped to the frame, with the hook across its top as the teaser shows it -->
-                                                <Grid Width="99" Height="176" CornerRadius="8" Background="{ThemeResource ControlAltFillColorSecondaryBrush}">
-                                                    <Image Source="{x:Bind views:ClipCard.ToImage(Poster), Mode=OneWay}" Stretch="UniformToFill" AutomationProperties.AccessibilityView="Raw" />
-                                                    <Border VerticalAlignment="Top" Padding="6,8,6,14" AutomationProperties.AccessibilityView="Raw">
-                                                        <Border.Background>
-                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                                                <GradientStop Offset="0" Color="#B0000000" />
-                                                                <GradientStop Offset="1" Color="#00000000" />
-                                                            </LinearGradientBrush>
-                                                        </Border.Background>
-                                                        <TextBlock Text="{x:Bind Hook, Mode=OneWay}" Foreground="White" FontSize="11" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
-                                                    </Border>
-                                                    <Button Style="{StaticResource PlayOverPicture}" Command="{x:Bind WatchCommand}" AutomationProperties.Name="Watch this teaser"
-                                                            ToolTipService.ToolTip="Watch this teaser as it stands, small and quick, before rendering it. Costs nothing.">
-                                                        <SymbolIcon Symbol="Play" />
-                                                    </Button>
-                                                    <Grid Background="{ThemeResource SmokeFillColorDefaultBrush}" Visibility="{x:Bind IsBusy, Mode=OneWay}">
-                                                        <ProgressRing IsActive="{x:Bind IsBusy, Mode=OneWay}" Width="32" Height="32" />
-                                                    </Grid>
-                                                </Grid>
-                                                <StackPanel Grid.Column="1" Spacing="6">
-                                                    <TextBox Text="{x:Bind Hook, Mode=TwoWay}" MaxLength="80" TextWrapping="Wrap" PlaceholderText="Hook" AutomationProperties.Name="Hook"
-                                                             ToolTipService.ToolTip="Shown across the top of the teaser. Eight words at most; any more are left off." />
-                                                    <!-- Each moment: the clip it is cut from, and where in that clip, dragged along the clip's length. Advanced:
-                                                         the suggested moments are what most teasers need. -->
-                                                    <ItemsControl ItemsSource="{x:Bind Moments}" Visibility="{x:Bind Advanced, Mode=OneWay}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate x:DataType="vm:MomentViewModel">
-                                                                <StackPanel Margin="0,0,0,4">
-                                                                    <ComboBox ItemsSource="{x:Bind ClipChoices}" SelectedIndex="{x:Bind ClipIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Clip"
-                                                                              ToolTipService.ToolTip="The clip this moment is cut from. Pick another to swap the moment, then drag along the strip below to choose where it starts." />
-                                                                    <Grid ColumnSpacing="6">
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="*" />
-                                                                            <ColumnDefinition Width="Auto" />
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <Slider Maximum="{x:Bind LatestStart, Mode=OneWay}" StepFrequency="0.5" SmallChange="0.5" LargeChange="2" Value="{x:Bind Start, Mode=TwoWay}" VerticalAlignment="Center"
-                                                                                AutomationProperties.Name="Starts at, in seconds"
-                                                                                ToolTipService.ToolTip="Where in its clip this moment starts, in seconds: left is the clip's start. Drag it, or use the arrows, then watch the teaser to check." />
-                                                                        <TextBlock Grid.Column="1" Text="{x:Bind LengthText}" Style="{StaticResource QuietText}" VerticalAlignment="Center" />
-                                                                    </Grid>
-                                                                </StackPanel>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
-                                                        <CheckBox Content="Fill" MinWidth="0" IsChecked="{x:Bind Fill, Mode=TwoWay}" Visibility="{x:Bind Advanced, Mode=OneWay}"
-                                                                  ToolTipService.ToolTip="Crop the picture to fill the upright frame, instead of showing it whole over a blurred copy of itself. Fuller, but the sides are lost: watch it to check the robot is still in shot." />
-                                                        <CheckBox Content="Keep" MinWidth="0" IsChecked="{x:Bind Keep, Mode=TwoWay}" ToolTipService.ToolTip="Ticked teasers are rendered when you press Render teasers. Untick one to leave it out." />
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                    </ScrollViewer>
-                </Grid>
-                <!-- Beside the teasers: the master video, top to bottom in the order it is done: render it, then its
-                     chapters and thumbnail, then send it to YouTube -->
-                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Finished video" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                        <TextBlock Style="{StaticResource QuietText}"
-                                   Text="{x:Bind ViewModel.MasterSizeText, Mode=OneWay}" />
-                        <!-- The thing this step is for, so the one lit button on the page -->
-                        <Button x:Name="RenderButton" HorizontalAlignment="Stretch" MinHeight="44" Content="Render master video" Style="{ThemeResource AccentButtonStyle}" Command="{x:Bind ViewModel.RenderCommand}"
-                                ToolTipService.ToolTip="Build the finished video file with voice, pictures and captions, plus a chapter list, subtitles, a thumbnail and an upload description. A full episode can take several minutes the first time; clips that have not changed since the last render are not drawn again." />
-                        <Button x:Name="ShowFilesButton" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.ShowExportCommand}" Visibility="{x:Bind ViewModel.HasExport, Mode=OneWay}"
-                                AutomationProperties.Name="Show the finished files"
-                                ToolTipService.ToolTip="Open the folder holding the finished video and everything made to upload with it.">
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
-                                <SymbolIcon Symbol="Folder" />
-                                <TextBlock Text="Show the finished files" />
-                            </StackPanel>
-                        </Button>
-                        <views:PublishPanel ViewModel="{x:Bind ViewModel}" />
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
+            <views:PublishPage x:Name="Publish" ViewModel="{x:Bind ViewModel}" Visibility="{x:Bind ViewModel.ShowPublish, Mode=OneWay}" />
         </Grid>
 
         <!-- What the app is doing and what it has to say, floating over the foot of the page so nothing moves when a job

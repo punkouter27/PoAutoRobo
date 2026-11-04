@@ -10,7 +10,7 @@ public static class JsonFile
     {
         try
         {
-            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), options) ?? fallback;
+            return Json.Read<T>(File.ReadAllText(path), options) ?? fallback;
         }
         catch (Exception e) when (e is IOException or JsonException)
         {
@@ -23,7 +23,7 @@ public static class JsonFile
         try
         {
             Files.EnsureFolderFor(path);
-            File.WriteAllText(path, JsonSerializer.Serialize(value, options));
+            File.WriteAllText(path, Json.Write(value, options));
         }
         catch (IOException)
         {

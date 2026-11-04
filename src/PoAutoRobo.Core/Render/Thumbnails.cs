@@ -67,13 +67,15 @@ public sealed partial class EpisodeBuilder
         return made;
     }
 
-    // ponytail: a title is broken into lines of about 22 characters and cut at three lines; a very long title loses its end.
+    // A title is broken into lines of about 22 characters and cut at three; a longer one ends in "…" so the cut shows.
     private static string TitleLines(string title)
     {
         var lines = new List<string> { "" };
         foreach (var word in Durations.SplitWords(title))
             if (lines[^1].Length > 0 && lines[^1].Length + word.Length >= 22) lines.Add(word);
             else lines[^1] = (lines[^1] + " " + word).Trim();
+        if (lines.Count > 3)
+            lines[2] += "…";
         return string.Join('\n', lines.Take(3));
     }
 }

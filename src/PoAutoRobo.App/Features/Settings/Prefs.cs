@@ -1,4 +1,7 @@
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace PoAutoRobo.App.ViewModels;
 
 /// <summary>The few choices the app remembers between runs, and where the user was when it closed.</summary>
@@ -10,7 +13,12 @@ public sealed record Prefs(
     int ExportPresetIndex = 0, bool DraftPictures = false, string? LastEpisodeFolder = null, int Page = 0, int InspectorTab = 0,
     double MonthlyBudget = 0, bool Advanced = false)
 {
-    public static Prefs Load() => JsonFile.Load(AppPaths.Prefs, new Prefs());
+    private static readonly JsonSerializerOptions Options = Json.Knowing(new(), PrefsJson.Default);
 
-    public void Save() => JsonFile.Save(AppPaths.Prefs, this);
+    public static Prefs Load() => JsonFile.Load(AppPaths.Prefs, new Prefs(), Options);
+
+    public void Save() => JsonFile.Save(AppPaths.Prefs, this, Options);
 }
+
+[JsonSerializable(typeof(Prefs))]
+internal sealed partial class PrefsJson : JsonSerializerContext;

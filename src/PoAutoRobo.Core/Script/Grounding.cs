@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Azure.AI.OpenAI;
 
@@ -73,7 +74,7 @@ public sealed partial class Grounding(RepoSource source, string cacheFolder)
             List<DocPage> pages;
             if (File.Exists(listFile) && File.GetLastWriteTimeUtc(listFile) > DateTime.UtcNow - TimeSpan.FromDays(1))
             {
-                pages = JsonSerializer.Deserialize<List<DocPage>>(await File.ReadAllTextAsync(listFile, ct)) ?? [];
+                pages = JsonSerializer.Deserialize(await File.ReadAllTextAsync(listFile, ct), PageJson.Default.ListDocPage) ?? [];
             }
             else
             {
@@ -84,7 +85,7 @@ public sealed partial class Grounding(RepoSource source, string cacheFolder)
                     .Where(page => DocExtensions.Contains(Path.GetExtension(page.Path), StringComparer.OrdinalIgnoreCase)
                         && !NotDocs.Any(name => Path.GetFileName(page.Path).StartsWith(name, StringComparison.OrdinalIgnoreCase)))];
                 Directory.CreateDirectory(docsFolder);
-                await File.WriteAllTextAsync(listFile, JsonSerializer.Serialize(pages), ct);
+                await File.WriteAllTextAsync(listFile, JsonSerializer.Serialize(pages, PageJson.Default.ListDocPage), ct);
             }
 
             var wanted = pages
@@ -162,6 +163,9 @@ public sealed partial class Grounding(RepoSource source, string cacheFolder)
 
     private sealed record DocPage(string Path, string Sha);
 
+    [JsonSerializable(typeof(List<DocPage>))]
+    private sealed partial class PageJson : JsonSerializerContext;
+
     /// <summary>
     /// More words to search by, as they would be written in the code and the documents, from the lesson; null to
     /// search by the lesson's own words alone. When it fails the lesson's own words are used.
@@ -211,7 +215,7 @@ public sealed partial class Grounding(RepoSource source, string cacheFolder)
         try
         {
             var file = Path.Combine(cacheFolder, EmbeddingsFile);
-            var known = File.Exists(file) ? JsonSerializer.Deserialize<Dictionary<string, float[]>>(await File.ReadAllTextAsync(file, ct)) ?? [] : [];
+            var known = File.Exists(file) ? Json.Read<Dictionary<string, float[]>>(await File.ReadAllTextAsync(file, ct)) ?? [] : [];
             static string Key(string text) => Files.TextHash(text)[..32];
 
             var fresh = chunks.Select(c => c.Text).Append(topic).Distinct().Where(text => !known.ContainsKey(Key(text))).ToList();
@@ -221,7 +225,7 @@ public sealed partial class Grounding(RepoSource source, string cacheFolder)
                 for (var i = 0; i < fresh.Count; i++)
                     known[Key(fresh[i])] = made[i];
                 Directory.CreateDirectory(cacheFolder);
-                await File.WriteAllTextAsync(file, JsonSerializer.Serialize(known), ct);
+                await File.WriteAllTextAsync(file, Json.Write(known), ct);
             }
             var wanted = known[Key(topic)];
             return [.. chunks.Select(c => Math.Max(0, Cosine(wanted, known[Key(c.Text)])))];
@@ -253,13 +257,13 @@ public sealed partial class Grounding(RepoSource source, string cacheFolder)
         {
             var documents = await source(repo, keywords, ct);
             Directory.CreateDirectory(cacheFolder);
-            await File.WriteAllTextAsync(cached, JsonSerializer.Serialize(documents), ct);
+            await File.WriteAllTextAsync(cached, Json.Write(documents), ct);
             return documents;
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             // Rate limit, no network, repository moved: grounding is a help, never a reason to fail the episode.
-            return File.Exists(cached) ? JsonSerializer.Deserialize<List<RepoDocument>>(await File.ReadAllTextAsync(cached, ct)) ?? [] : [];
+            return File.Exists(cached) ? Json.Read<List<RepoDocument>>(await File.ReadAllTextAsync(cached, ct)) ?? [] : [];
         }
     }
 

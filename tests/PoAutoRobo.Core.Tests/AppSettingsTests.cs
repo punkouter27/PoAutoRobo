@@ -16,7 +16,7 @@ public sealed class AppSettingsTests
     {
         public List<string> Asked { get; } = [];
 
-        public Task<string?> GetAsync(string name, CancellationToken ct)
+        public Task<string?> GetAsync(string name, CancellationToken _)
         {
             Asked.Add(name);
             return failure is not null ? Task.FromException<string?>(failure) : Task.FromResult(secrets.GetValueOrDefault(name));

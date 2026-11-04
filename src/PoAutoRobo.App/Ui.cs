@@ -22,12 +22,37 @@ public static class Ui
     /// <summary>Shown when either is so: an advanced control, shown too while what it sets is not the standard value, so nothing hidden changes what is made.</summary>
     public static Visibility ShowEither(bool first, bool second) => Show(first || second);
 
+    /// <summary>
+    /// <see cref="ShowEither"/> for a control that also needs something else, such as a film: shown while advanced or
+    /// set away from the standard, and only while <paramref name="needs"/> is so.
+    /// </summary>
+    public static Visibility ShowEitherIf(bool first, bool second, bool needs) => Show((first || second) && needs);
+
     /// <summary>The opposite, for a control that may be used only while something is not so.</summary>
     public static bool Not(bool on) => !on;
 
     public static Visibility ShowText(string? text) => Show(!string.IsNullOrEmpty(text));
 
     public static Visibility HideText(string? text) => Show(string.IsNullOrEmpty(text));
+
+    /// <summary>
+    /// Puts a new file in a player and lets go of the one it was playing. A player does not close its old source when
+    /// given another, so the old file stays open until the collector gets round to it, and a re-render or the scratch
+    /// sweep cannot replace it meanwhile. Null just lets go.
+    /// </summary>
+    public static void Play(Windows.Media.Playback.MediaPlayer player, string? path)
+    {
+        var old = player.Source as IDisposable;
+        player.Source = path is null ? null : Windows.Media.Core.MediaSource.CreateFromUri(new Uri(path));
+        old?.Dispose();
+    }
+
+    /// <summary>Lets go of the file a player holds, then of the player itself.</summary>
+    public static void Close(Windows.Media.Playback.MediaPlayer player)
+    {
+        Play(player, null);
+        player.Dispose();
+    }
 
     /// <summary>Shown when a choice is on a particular entry: a step, a tab.</summary>
     public static Visibility ShowIf(int value, int wanted) => Show(value == wanted);

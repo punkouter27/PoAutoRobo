@@ -37,12 +37,6 @@ public sealed partial class LessonPage : UserControl
     /// <summary>Each saved episode's menu button is named by its episode, so a screen reader can tell them apart.</summary>
     public static string ActionsFor(string title) => $"More for {title}";
 
-    private async void OnOpenFromMenu(object sender, RoutedEventArgs e)
-    {
-        if (ViewModel is not null && Episode(sender) is { } summary)
-            await ViewModel.OpenEpisodeAsync(summary.Folder);
-    }
-
     private async void OnDuplicateEpisode(object sender, RoutedEventArgs e)
     {
         if (ViewModel is not null && Episode(sender) is { } summary)

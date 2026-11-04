@@ -14,15 +14,15 @@ public enum IntroLayout { Side, Centre, Lower }
 /// The files are the kit's own copies, named by what they are for ("logo.png"), so moving or deleting the file the
 /// user picked changes nothing. Only a bare file name is kept, and only a file in the kit's folder is ever used.
 /// </remarks>
-public sealed record SeriesKit
+public sealed record SeriesKit(string ChannelName = "", string Tagline = "", CaptionStyle? Captions = null, int OutroSeconds = 15)
 {
     public const string FileName = "series.json";
     public const int MinOutroSeconds = 5;
     public const int MaxOutroSeconds = 20; // YouTube end-screen cards can be shown over the last 5 to 20 seconds
 
-    public string ChannelName { get; init; } = "";
+    public string ChannelName { get; init; } = ChannelName;
 
-    public string Tagline { get; init; } = "";
+    public string Tagline { get; init; } = Tagline;
 
     public string? Logo { get; init; }
 
@@ -39,9 +39,9 @@ public sealed record SeriesKit
     /// <summary>The shape every episode follows, so each lesson is told the same way.</summary>
     public BeatStructure Structure { get; init; }
 
-    public CaptionStyle Captions { get; init; } = new();
+    public CaptionStyle Captions { get; init; } = Captions ?? new();
 
-    public int OutroSeconds { get; init; } = 15;
+    public int OutroSeconds { get; init; } = OutroSeconds;
 
     /// <summary>How the intro is laid out. The outro keeps one layout, as YouTube's end-screen cards need its right half.</summary>
     public IntroLayout Layout { get; init; }
@@ -62,8 +62,9 @@ public sealed record SeriesKit
     /// What the kids' series starts with: a cheerful name to change, a toy review for its shape and a brighter colour.
     /// </summary>
     /// <remarks>
-    /// ponytail: its logo, mascot and sting left unset are still the app's own robot ones (see <c>Emblem</c>), until
-    /// the owner picks their own on the Series step. Give <c>Emblem</c> a toy-box design to lift it.
+    /// ponytail: its logo and mascot left unset are a teddy of the app's own (<c>Emblem</c>), but its sting is still the
+    /// robot series' one (<c>Synth.Sting</c>), until the owner picks their own on the Series step. Give <c>Synth</c> a
+    /// brighter toy-box sting, chosen by show in <c>EpisodeBuilder.Bookends</c>, to lift it.
     /// </remarks>
     public static SeriesKit KidsStarter { get; } = new()
     {

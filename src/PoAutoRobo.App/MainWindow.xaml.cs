@@ -221,12 +221,13 @@ public sealed partial class MainWindow : WindowEx
         var anchor = card switch
         {
             ClipViewModel clip => ClipDeck.ContainerFromItem(clip) as FrameworkElement ?? Inspector,
-            TeaserViewModel teaser => TeaserCardList.ContainerFromItem(teaser) as FrameworkElement,
+            TeaserViewModel teaser => Publish.TeaserCardList.ContainerFromItem(teaser) as FrameworkElement,
             _ => null,
         };
         if (anchor is null || anchor.XamlRoot is null) return; // the page was left while it was being made
         var upright = card is TeaserViewModel;
-        var player = new Windows.Media.Playback.MediaPlayer { Source = Windows.Media.Core.MediaSource.CreateFromUri(new Uri(path)), AutoPlay = true };
+        var player = new Windows.Media.Playback.MediaPlayer { AutoPlay = true };
+        Ui.Play(player, path);
         var screen = new MediaPlayerElement { AreTransportControlsEnabled = true, Width = upright ? 270 : 480, Height = upright ? 480 : 270 };
         screen.TransportControls.IsCompact = true;
         screen.SetMediaPlayer(player);
@@ -236,7 +237,7 @@ public sealed partial class MainWindow : WindowEx
         presenter.Setters.Add(new Setter(FrameworkElement.MaxHeightProperty, 800d));
         presenter.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
         var flyout = new Flyout { Content = screen, FlyoutPresenterStyle = presenter };
-        flyout.Closed += (_, _) => player.Dispose(); // lets go of the file, which a later render may replace
+        flyout.Closed += (_, _) => Ui.Close(player); // lets go of the file, which a later render may replace
         flyout.ShowAt(anchor);
     }
 

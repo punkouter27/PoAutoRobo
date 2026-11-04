@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Azure.AI.OpenAI;
 using OpenAI.Chat;
@@ -17,12 +18,30 @@ public delegate Task<string> SeeingChat(string deployment, string system, string
 public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat chat) : IScriptWriter
 {
     // A reply with a field missing or null fails to read, so the records below can be trusted as written.
-    private static readonly JsonSerializerOptions Json = new()
+    private static readonly JsonSerializerOptions Replies = Json.Knowing(new()
     {
         PropertyNameCaseInsensitive = true,
         RespectNullableAnnotations = true,
         RespectRequiredConstructorParameters = true,
-    };
+    }, ReplyJson.Default);
+
+    // Every shape a reply is read as.
+    [JsonSerializable(typeof(OutlineDto))]
+    [JsonSerializable(typeof(TierDto))]
+    [JsonSerializable(typeof(ReviewDto))]
+    [JsonSerializable(typeof(RewriteDto))]
+    [JsonSerializable(typeof(DriftDto))]
+    [JsonSerializable(typeof(TeasersDto))]
+    [JsonSerializable(typeof(ShotsDto))]
+    [JsonSerializable(typeof(SearchDto))]
+    [JsonSerializable(typeof(HostDto))]
+    [JsonSerializable(typeof(LetteringDto))]
+    [JsonSerializable(typeof(SaferPicture))]
+    [JsonSerializable(typeof(Scene))]
+    [JsonSerializable(typeof(SceneVerdict))]
+    [JsonSerializable(typeof(FootageSeen))]
+    [JsonSerializable(typeof(PublishNotes))]
+    private sealed partial class ReplyJson : JsonSerializerContext;
 
     private sealed record TierDto(string Dialogue, string VisualPrompt, string Pose);
     // Footage is the number of the owner's file the clip shows, from 1; 0 for none.
@@ -347,7 +366,7 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
     {
         try
         {
-            var value = JsonSerializer.Deserialize<T>(reply, Json);
+            var value = Json.Read<T>(reply, Replies);
             // The serializer checks every field, but not for a null in the middle of a list.
             if (value is null || (value is OutlineDto outline && outline.Clips.Contains(null!)))
                 throw new JsonException("Reply is missing required fields.");

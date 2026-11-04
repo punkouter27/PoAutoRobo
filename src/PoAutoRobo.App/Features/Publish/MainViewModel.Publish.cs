@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Windows.ApplicationModel.DataTransfer;
 
 namespace PoAutoRobo.App.ViewModels;
 
@@ -44,15 +43,6 @@ public partial class MainViewModel
         UploadDescription = string.Join("\n\n", new[] { notes?.Description ?? "", Chapters.TrimEnd(), string.Join(' ', notes?.Hashtags ?? []) }.Where(p => p.Length > 0));
         UploadTags = string.Join(", ", notes?.Tags ?? []);
         VideoLink = "";
-    }
-
-    [RelayCommand]
-    private void CopyChapters()
-    {
-        var package = new DataPackage();
-        package.SetText(Chapters.ReplaceLineEndings("\r\n"));
-        Clipboard.SetContent(package);
-        StatusMessage = "Chapters copied. Paste them into the video's description.";
     }
 
     // ---- Thumbnail ----

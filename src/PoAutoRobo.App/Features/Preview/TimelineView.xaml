@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:app="using:PoAutoRobo.App"
+    xmlns:local="using:PoAutoRobo.App.Views"
     Unloaded="OnUnloaded">
     <!-- J, K and L, and comma and full stop, work wherever the keyboard is in the preview -->
     <Grid RowSpacing="8" KeyDown="OnTransportKey">
@@ -37,7 +38,7 @@
                                         ToolTipService.ToolTip="How thick the edge drawn round each letter is, which keeps the words readable over a busy picture. 0 for none." />
                                 <TextBlock Text="Accent colour" ToolTipService.ToolTip="The colour of the word being spoken, or of the banner behind the words. Click a swatch below, or open Any colour to choose your own." />
                                 <VariableSizedWrapGrid x:Name="Swatches" Orientation="Horizontal" MaximumRowsOrColumns="8" ItemWidth="36" ItemHeight="36" />
-                                <Expander Header="Any colour" Visibility="{x:Bind ViewModel.Advanced, Mode=OneWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                <Expander Header="Any colour" Visibility="{x:Bind local:TimelineView.ShowAnyColour(ViewModel.Advanced, ViewModel.CaptionAccent), Mode=OneWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                           ToolTipService.ToolTip="Choose an accent colour not among the swatches: pick it from the colour square, or type its hex code, such as your channel's own colour.">
                                     <ColorPicker IsAlphaEnabled="False" IsMoreButtonVisible="False" IsColorSliderVisible="True" IsColorChannelTextInputVisible="False"
                                                  IsHexInputVisible="True" Color="{x:Bind ViewModel.CaptionAccent, Mode=TwoWay}" />

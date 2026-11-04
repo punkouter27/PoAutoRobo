@@ -8,11 +8,7 @@
     <!-- Under the finished video: its chapters, a thumbnail to choose, and sending it to YouTube -->
     <StackPanel Spacing="10">
         <!-- Chapters -->
-        <Grid>
-            <TextBlock Text="Chapters" Style="{ThemeResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
-            <Button HorizontalAlignment="Right" Content="Copy" Command="{x:Bind ViewModel.CopyChaptersCommand}" Visibility="{x:Bind app:Ui.ShowText(ViewModel.Chapters), Mode=OneWay}"
-                    ToolTipService.ToolTip="Copy the chapter list, to paste into a video's description by hand. It is already in the description of the upload below. Free." />
-        </Grid>
+        <TextBlock Text="Chapters" Style="{ThemeResource BodyStrongTextBlockStyle}" />
         <TextBlock Text="{x:Bind ViewModel.ChaptersNote, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" />
         <TextBlock Text="{x:Bind ViewModel.Chapters, Mode=OneWay}" IsTextSelectionEnabled="True" FontFamily="Consolas" Visibility="{x:Bind app:Ui.ShowText(ViewModel.Chapters), Mode=OneWay}" />
 

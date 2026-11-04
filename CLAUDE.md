@@ -23,6 +23,7 @@ dotnet build PoAutoRobo.slnx
 dotnet test PoAutoRobo.slnx --filter "Category!=Integration&Category!=Live"   # unit tests, about a second
 dotnet test PoAutoRobo.slnx --filter "Category=Integration"                   # run FFmpeg and Edge for real
 dotnet format PoAutoRobo.slnx --verify-no-changes                             # CI runs this first
+pwsh tests/limits.ps1                                                         # each kind of test against its cap, after a build
 dotnet test PoAutoRobo.slnx --filter "FullyQualifiedName~FfmpegArgsTests"     # one class, or one test by its name
 dotnet publish src\PoAutoRobo.App -p:PublishProfile=Release                   # self-contained ReadyToRun build in bin\publish
 ```
@@ -47,7 +48,10 @@ Warnings are errors, analyzer and style rules included, and so is a package with
     YouTube upload (`YouTube`), thumbnails (`Thumbnails`) and the chapter list.
 - `src/PoAutoRobo.App`: the window (`MainWindow`, with `.Dialogs` and `.Taskbar` beside it). One view
   model, `MainViewModel`, in partial files by concern (`.Steps`, `.Library`, `.Footage`, `.Edits`, `.Pictures`,
-  `.Export`, `.Publish`, `.Series`, `.Teasers`, `.Activity`); views in `Views/`. Five steps, Series (the brand kit, on
+  `.Export`, `.Publish`, `.Series`, `.Teasers`, `.Activity`). Files are grouped by step: `Features/<Step>/` holds a
+  step's page, its views, its parts of `MainViewModel` and its own view models (`Features/Settings` the side panel);
+  `Shell/` holds what every step shares. Namespaces stay `ViewModels` and `Views` whatever the folder, because
+  `MainViewModel` is one class across them. Five steps, Series (the brand kit, on
   `IntroPage`), Lesson, Clips, Preview and Publish, each with a checklist under the header (`MainViewModel.Guide`); name
   a step by its constant (`MainViewModel.ClipsStep`), never its number. A step's own actions sit on its page beside
   what they act on; the header holds only Undo, Redo, Settings and, under …, what is done to the open episode as a whole.
@@ -57,8 +61,14 @@ Warnings are errors, analyzer and style rules included, and so is a package with
 
 - **Every change to an episode goes through `MainViewModel.Edit`.** It saves, records undo, and brings the cards into
   line. The edits themselves are pure functions in `EpisodeEditor`; add one there, never mutate in the view model.
-- **`Episode`, `Clip` and `VisualSpec` are saved as JSON and read back strictly.** Add fields as optional parameters
-  or `init` properties with a default. New `VisualKind`s and `Look`s go on the end of the enum.
+- **`Episode`, `Clip` and `VisualSpec` are saved as JSON and read back strictly.** Add fields as optional parameters,
+  or `init` properties whose default is the type's own (null, 0, false); a property that needs another default takes
+  it from an optional parameter, as `Episode.Captions` does, because the JSON code made at build time sets every
+  `init` property and one missing from an older file would lose its default. New `VisualKind`s and `Look`s go on the
+  end of the enum, and a new enum in a saved type gets its converter in `ProjectStore.JsonOptions`.
+- **JSON goes through `Json` (`Library/Json.cs`), never `JsonSerializer`'s reflection.** Core is built
+  `IsAotCompatible`, so its JSON is described at build time: a new saved or read type is listed in `CoreJson` (or a
+  context of its own beside a private type), and anything sent that has no type of its own is a `JsonObject`.
 - **Media paths must be full paths inside the episode folder.** `ProjectStore.KeepOwnMedia` drops any that are not
   (relative and drive-relative ones included), on load. `FfmpegRunner` limits every FFmpeg and ffprobe input to files
   and its own pipe, so a disguised playlist cannot reach the network.
@@ -96,7 +106,7 @@ Warnings are errors, analyzer and style rules included, and so is a package with
   made, so its value goes back to the standard one when advanced controls are turned off. Where that would undo the
   user's own setting (a caption size, the outro's length, a model's name), its control stays in view while it is set
   away from the standard instead (`Ui.ShowEither`).
-- **Choices remembered between runs live in Settings** (`Views/SettingsPanel`, in the side panel at the window's right,
+- **Choices remembered between runs live in Settings** (`Features/Settings/SettingsPanel`, in the side panel at the window's right,
   saved in `Prefs`), not in a flyout of their own. Questions about money or publishing (`Confirm`, `ConfirmSpend`) stay
   modal dialogs. What every episode of the series shares (its look, its shape, its intro and outro) is the brand kit's,
   set on the Series step.
@@ -113,7 +123,8 @@ Warnings are errors, analyzer and style rules included, and so is a package with
 - A deliberate shortcut is marked `// ponytail:` with its ceiling and how to lift it.
 - Prompt text and FFmpeg arguments are snapshot-tested with Verify. A changed `.received.` file is the new truth
   only once you have read the difference; then replace the `.verified.` file with it.
-- Unit tests are capped at 100 and integration tests at 50. One test may cover several cases of one behaviour; tests that run FFmpeg or Edge are
+- Unit tests are capped at 100, integration tests at 50 and live tests at 25; `tests/limits.ps1` counts them and CI
+  fails past a cap. There are no API or UI tests: the app has no API, and the app project has no tests. One test may cover several cases of one behaviour; tests that run FFmpeg or Edge are
   tagged `Integration`, tests that call real services `Live` (they pass by doing nothing without a sign-in).
 
 ## Configuration
