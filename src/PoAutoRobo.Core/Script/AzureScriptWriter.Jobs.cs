@@ -43,17 +43,21 @@ public sealed partial class AzureScriptWriter
     private static bool IsBusy(Exception e, CancellationToken ct) =>
         e is System.ClientModel.ClientResultException { Status: 429 or 503 } or TimeoutException || (e is OperationCanceledException && !ct.IsCancellationRequested);
 
-    public async Task<IReadOnlyList<ClipNote>> ReviewAsync(Episode episode, CancellationToken ct)
+    public async Task<IReadOnlyList<ClipNote>> ReviewAsync(Episode episode, IReadOnlyList<GroundingSnippet> references, CancellationToken ct)
     {
         var script = string.Join("\n\n", episode.Clips.Select((c, i) => $"Clip {i + 1}: {c.Title}\n{c.Active.Dialogue}"));
-        var review = await Ask<ReviewDto>(settings.FastChatDeployment, ScriptSchemas.ReviewSystem, Fenced("existing", "", script), "review", ScriptSchemas.Review, ct);
+        // The passages go after the script, fenced like it: anyone can edit a repository.
+        var request = new StringBuilder(Fenced("existing", "", script));
+        foreach (var snippet in references)
+            request.AppendLine().Append(Fenced("reference", $" source=\"{Attribute(snippet.Repo)} · {Attribute(snippet.Path)}\"", snippet.Text));
+        var review = await Ask<ReviewDto>(settings.FastChatDeployment, references.Count > 0 ? ScriptSchemas.CheckedReviewSystem : ScriptSchemas.ReviewSystem, request.ToString(), "review", ScriptSchemas.Review, ct);
         // One note a clip, and only for clips that are there: the model's numbering is not trusted further than that.
         return [.. review.Notes.Where(n => n is not null && n.Clip >= 1 && n.Clip <= episode.Clips.Count && !string.IsNullOrWhiteSpace(n.Note)).DistinctBy(n => n.Clip)];
     }
 
     // The editor's note is a model's words, so it is fenced like the clip's own.
     public async Task<string> ReviseAsync(Clip clip, string note, CancellationToken ct) =>
-        (await Ask<RewriteDto>(settings.ChatDeployment, ScriptSchemas.ReviseSystem,
+        (await Ask<RewriteDto>(settings.ChatDeployment, ScriptSchemas.ReviseSystem(Show),
             Fenced("existing", " what=\"the clip's title\"", clip.Title) + Fenced("existing", " what=\"the narration\"", clip.Active.Dialogue) + Fenced("existing", " what=\"the editor's note\"", note),
             "rewrite", ScriptSchemas.Rewrite, ct)).Dialogue;
 
@@ -66,7 +70,7 @@ public sealed partial class AzureScriptWriter
             // A title and its words were written by a model, from repository passages anyone can edit, so they are fenced like those passages.
             .Append(Fenced("existing", " what=\"the clip's title\"", clip.Title))
             .Append(Fenced("existing", $" depth=\"{clip.ActiveTier.ToString().ToLowerInvariant()}\"", clip.Active.Dialogue));
-        var script = await Ask<TierDto>(settings.FastChatDeployment, ScriptSchemas.TierSystem, request.ToString(), "tier", ScriptSchemas.Tier, ct);
+        var script = await Ask<TierDto>(settings.FastChatDeployment, ScriptSchemas.TierSystem(Show), request.ToString(), "tier", ScriptSchemas.Tier, ct);
         return new TierScript(script.Dialogue, script.VisualPrompt, script.Pose);
     }
 
@@ -75,7 +79,7 @@ public sealed partial class AzureScriptWriter
             Fenced("existing", " version=\"first\"", oldDialogue) + Fenced("existing", " version=\"second\"", newDialogue), "drift", ScriptSchemas.Drift, ct)).CoreChanged;
 
     public async Task<string> RewriteToLengthAsync(string dialogue, int targetWords, CancellationToken ct) =>
-        (await Ask<RewriteDto>(settings.ChatDeployment, ScriptSchemas.RewriteSystem,
+        (await Ask<RewriteDto>(settings.ChatDeployment, ScriptSchemas.RewriteSystem(Show),
             $"Rewrite the line below to about {targetWords} words.\n" + Fenced("existing", "", dialogue), "rewrite", ScriptSchemas.Rewrite, ct)).Dialogue;
 
     public async Task<IReadOnlyList<Teaser>> SuggestTeasersAsync(Episode episode, IReadOnlyDictionary<Guid, TimeSpan> lengths, CancellationToken ct)
@@ -84,7 +88,7 @@ public sealed partial class AzureScriptWriter
         // model saw in the owner's films says where in them the moment worth cutting to is.
         var script = string.Join("\n\n", episode.Clips.Select((c, i) => FormattableString.Invariant(
             $"Clip {i + 1} ({c.Beat ?? "no beat"}, {(lengths.TryGetValue(c.Id, out var length) ? length.TotalSeconds : 0):0.0} s): {c.Title}\n{(c.OwnSound ? "[the owner's film, with its own sound] " : "")}{c.Active.Dialogue}{(c.FootageSeen is { } seen ? $"\n[seen in the film] {seen.ReplaceLineEndings(" ")}" : "")}")));
-        var reply = await AskLight<TeasersDto>(ScriptSchemas.TeasersSystem, Fenced("existing", " what=\"the finished script\"", script), "teasers", ScriptSchemas.Teasers, ct);
+        var reply = await AskLight<TeasersDto>(ScriptSchemas.TeasersSystem(BeatPlan.ShowOf(episode.Structure)), Fenced("existing", " what=\"the finished script\"", script), "teasers", ScriptSchemas.Teasers, ct);
         var suggested = reply.Teasers.Where(t => t is not null).Select(t => new Teaser(t.Hook, [.. t.Moments
             .Where(m => m is not null && m.Clip >= 1 && m.Clip <= episode.Clips.Count)
             .Select(m => new TeaserMoment(episode.Clips[m.Clip - 1].Id, TimeSpan.FromSeconds(Math.Max(0, m.Start)), TimeSpan.FromSeconds(Math.Max(0, m.Length))))]));
@@ -93,7 +97,7 @@ public sealed partial class AzureScriptWriter
     }
 
     public Task<PublishNotes> WritePublishNotesAsync(Episode episode, CancellationToken ct) =>
-        AskLight<PublishNotes>(ScriptSchemas.PublishSystem,
+        AskLight<PublishNotes>(ScriptSchemas.PublishSystem(BeatPlan.ShowOf(episode.Structure)),
             Fenced("existing", "", string.Join("\n\n", episode.Clips.Select(c => $"{c.Title}\n{c.Active.Dialogue}"))), "publish", ScriptSchemas.Publish, ct);
 
     /// <summary>The most shots kept for one beat, so the list stays one to film from.</summary>
@@ -102,7 +106,7 @@ public sealed partial class AzureScriptWriter
     public async Task<IReadOnlyList<Shot>> SuggestShotsAsync(Lesson lesson, CancellationToken ct)
     {
         var beats = BeatPlan.Beats(lesson.Structure).Where(b => b.ForFootage).Select(b => b.Name).ToList();
-        var reply = await AskLight<ShotsDto>(ScriptSchemas.ShotsSystem,
+        var reply = await AskLight<ShotsDto>(ScriptSchemas.ShotsSystem(BeatPlan.ShowOf(lesson.Structure)),
             $"Beats to film, in order: {string.Join(", ", beats)}.\n" + Fenced("topic", "", Capped(lesson.Topic)), "shots", ScriptSchemas.Shots, ct);
         // Only the beats asked about, in their order, and a few to each.
         return [.. beats.SelectMany(beat => reply.Shots.Where(s => s is not null && s.Beat == beat && !string.IsNullOrWhiteSpace(s.Shot))
@@ -116,14 +120,21 @@ public sealed partial class AzureScriptWriter
         [.. (await AskLight<SearchDto>(ScriptSchemas.SearchSystem, Fenced("topic", "", Capped(topic)), "search", ScriptSchemas.Search, ct)).Terms
             .Where(t => t is not null).Select(t => t.Trim()).Where(t => t.Length is >= 2 and <= 40).Distinct(StringComparer.OrdinalIgnoreCase).Take(MaxSearchTerms)];
 
-    public async Task<FootageSeen?> WatchAsync(IReadOnlyList<Frame> frames, string note, CancellationToken ct)
+    public async Task<FootageSeen?> WatchAsync(IReadOnlyList<Frame> frames, string note, Show show, CancellationToken ct)
     {
         if (See is null || frames.Count == 0) return null;
-        var reply = await See(settings.FastChatDeployment, ScriptSchemas.WatchSystem,
+        var reply = await See(settings.FastChatDeployment, ScriptSchemas.WatchSystem(show),
             note.Trim().Length > 0 ? Fenced("existing", " what=\"the owner's note on the film\"", note) : "The owner wrote no note on it.",
             [.. frames.Select(f => (FormattableString.Invariant($"At {f.At.TotalSeconds:0.0} s:"), f.Path))], "watch", ScriptSchemas.Watch, ct);
         var seen = Read<FootageSeen>(reply);
         return seen with { Highlight = Math.Clamp(seen.Highlight, 0, frames[^1].At.TotalSeconds + 1) };
+    }
+
+    public async Task<string?> CheckLetteringAsync(string picturePath, CancellationToken ct)
+    {
+        if (See is null) return null;
+        var verdict = Read<LetteringDto>(await See(settings.FastChatDeployment, ScriptSchemas.LetteringSystem, "The picture:", [("", picturePath)], "lettering", ScriptSchemas.Lettering, ct));
+        return verdict.Lettered ? (verdict.Text.Trim() is { Length: > 0 } text ? text : "some lettering") : null;
     }
 
     public async Task<SceneVerdict> CheckSceneAsync(string framePath, CancellationToken ct)

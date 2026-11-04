@@ -70,6 +70,9 @@ public sealed record Clip(
 
     /// <summary>What a model saw happen in the owner's film, a line to each stretch; null when it was not watched.</summary>
     public string? FootageSeen { get; init; }
+
+    /// <summary>The pictures it shows are quick drafts, to be drawn again at full quality once the episode is right.</summary>
+    public bool Draft { get; init; }
 }
 
 /// <summary>
@@ -102,6 +105,12 @@ public sealed record Episode(
 
     /// <summary>A music track played quietly under the narration, inside the episode folder; null for none.</summary>
     public string? MusicPath { get; init; }
+
+    /// <summary>
+    /// How the main thing in the pictures looks (the robot, the toy), in a sentence, so every picture draws it alike
+    /// from one reference picture; null for episodes written before there was one, which are drawn without it.
+    /// </summary>
+    public string? Subject { get; init; }
 
     /// <summary>The shots planned for filming the lesson, as ticked off; empty when none were asked for.</summary>
     public IReadOnlyList<Shot> Shots { get; init; } = [];

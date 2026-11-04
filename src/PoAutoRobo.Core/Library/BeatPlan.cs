@@ -1,10 +1,17 @@
 namespace PoAutoRobo.Core.Library;
 
 /// <summary>
-/// The shapes an episode can take. Every episode of the series follows one, so each lesson is told the same way.
-/// New structures go on the end: saved episodes name theirs.
+/// The shapes an episode can take. Every episode of a series follows one, so each is told the same way. The first
+/// three tell a robot lesson; the last two a kids' video. New structures go on the end: saved episodes name theirs.
 /// </summary>
-public enum BeatStructure { Story, Tutorial, HookFirst }
+public enum BeatStructure { Story, Tutorial, HookFirst, ToyReview, Highlights }
+
+/// <summary>
+/// Which of the owner's two series an episode belongs to: teaching the robot, or a little boy playing, for young
+/// children. Each has its own brand kit, shapes, prompts and numbering. An episode's shape says which it is, so
+/// nothing more is saved. New shows go on the end.
+/// </summary>
+public enum Show { Robot, Kids }
 
 /// <summary>One section of an episode, shown on screen as a strap when it starts.</summary>
 /// <param name="ForFootage">Real footage of the robot belongs here, more than pictures made for the episode.</param>
@@ -17,8 +24,17 @@ public static class BeatPlan
     {
         BeatStructure.Tutorial => [new("Concept", false), new("Setup", true), new("Demo", true), new("Recap", false)],
         BeatStructure.HookFirst => [new("Hook", true), new("Explain", false), new("Demo", true), new("Next time", false)],
+        BeatStructure.ToyReview => [new("Hello", false), new("Unboxing", true), new("Play time", true), new("What he thinks", true), new("Bye", false)],
+        BeatStructure.Highlights => [new("Hello", false), new("Best bits", true), new("Bye", false)],
         _ => [new("Goal", false), new("Try", true), new("Fail", true), new("Fix", false), new("Result", true), new("Recap", false)],
     };
+
+    /// <summary>The series an episode of this shape belongs to.</summary>
+    public static Show ShowOf(BeatStructure structure) => structure is BeatStructure.ToyReview or BeatStructure.Highlights ? Show.Kids : Show.Robot;
+
+    /// <summary>The shapes a series can choose from, in the order they are offered.</summary>
+    public static IReadOnlyList<BeatStructure> Structures(Show show) =>
+        show == Show.Kids ? [BeatStructure.ToyReview, BeatStructure.Highlights] : [BeatStructure.Story, BeatStructure.Tutorial, BeatStructure.HookFirst];
 
     /// <summary>
     /// Holds a written script to its structure, whatever the model did: every clip in one of its beats and the beats

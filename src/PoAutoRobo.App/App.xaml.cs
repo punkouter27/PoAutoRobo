@@ -85,6 +85,7 @@ public partial class App : Application
             visualsFor = (folder, quality) => new Visuals(images.GenerateAsync, new MediaCache(Path.Combine(folder, "images")), AppPaths.HostSheet, settings.ImageDeployment)
             {
                 Quality = quality,
+                Subjects = new MediaCache(Path.Combine(folder, "subject")),
                 // Each picture really made is added to the episode's running cost, when its price is known.
                 PictureMade = CostEstimate.PriceOf(settings.ImageDeployment, quality) is { } dollars ? () => SpendLog.Add(folder, SpendLog.Picture, dollars) : null,
                 VideoMade = () => SpendLog.Add(folder, SpendLog.AiVideo, CostEstimate.VideoPrice),

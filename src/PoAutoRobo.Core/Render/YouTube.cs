@@ -16,7 +16,14 @@ public delegate Task<HttpResponseMessage> SendHttp(HttpRequestMessage request, C
 public enum Privacy { Private, Unlisted, Public }
 
 /// <param name="PublishAt">When the video goes public by itself; it is uploaded private until then. Null for no schedule.</param>
-public sealed record UploadDetails(string Title, string Description, IReadOnlyList<string> Tags, Privacy Privacy, DateTimeOffset? PublishAt = null);
+public sealed record UploadDetails(string Title, string Description, IReadOnlyList<string> Tags, Privacy Privacy, DateTimeOffset? PublishAt = null)
+{
+    /// <summary>
+    /// The video is made for children, as every kids' series video is. YouTube and US law (COPPA) ask that this be said
+    /// at upload: comments and personalised ads are then off.
+    /// </summary>
+    public bool MadeForKids { get; init; }
+}
 
 /// <summary>
 /// Uploads to the owner's YouTube channel with the YouTube Data API. Every upload signs in afresh in the browser, and
@@ -131,7 +138,7 @@ public sealed class YouTube(string clientId, string clientSecret, SendHttp send)
         var status = new JsonObject
         {
             ["privacyStatus"] = (details.PublishAt is null ? details.Privacy : Privacy.Private).ToString().ToLowerInvariant(),
-            ["selfDeclaredMadeForKids"] = false,
+            ["selfDeclaredMadeForKids"] = details.MadeForKids,
         };
         if (details.PublishAt is { } at)
             status["publishAt"] = at.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);

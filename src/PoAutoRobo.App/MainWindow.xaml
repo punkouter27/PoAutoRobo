@@ -249,6 +249,13 @@
                 <views:TimelineView ViewModel="{x:Bind ViewModel}" />
                 <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="10">
+                        <!-- Only while some clips show draft pictures: the second half of draft first, final once it is right -->
+                        <StackPanel Spacing="{StaticResource GapSmall}" Visibility="{x:Bind ViewModel.HasDraftPictures, Mode=OneWay}">
+                            <TextBlock Text="Draft pictures" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <TextBlock Text="{x:Bind ViewModel.DraftPicturesText, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap" />
+                            <Button x:Name="FinalPicturesButton" Content="Make final pictures" HorizontalAlignment="Stretch" MinHeight="44" Command="{x:Bind ViewModel.MakeFinalPicturesCommand}"
+                                    ToolTipService.ToolTip="Draws every draft picture again at full quality, from the same description, for the master video. You are shown the cost and asked first. Make the preview again afterwards to watch them." />
+                        </StackPanel>
                         <TextBlock Text="Captions" Style="{ThemeResource BodyStrongTextBlockStyle}" />
                         <TextBlock Style="{StaticResource QuietText}" Text="Set on the preview itself: Aa, in its top corner. The words show the new style as you change it, and new episodes start with the style picked last." />
 

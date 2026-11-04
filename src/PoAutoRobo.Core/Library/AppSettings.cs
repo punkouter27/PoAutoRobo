@@ -84,7 +84,7 @@ public sealed record AppSettings(Uri? Endpoint, string? GitHubToken)
     public const string YouTubeIdSecret = "YouTube--ClientId", YouTubeSecretSecret = "YouTube--ClientSecret";
 
     /// <summary>The variables that switch the optional services; one that is set wins over the switch in Settings.</summary>
-    public static readonly string[] ServiceVariables = ["POAUTOROBO_VIDEO_MODEL", "POAUTOROBO_LOCAL_MODEL", "POAUTOROBO_EMBEDDING_MODEL"];
+    public static readonly string[] ServiceVariables = ["POAUTOROBO_VIDEO_MODEL", "POAUTOROBO_LOCAL_MODEL", "POAUTOROBO_EMBEDDING_MODEL", "POAUTOROBO_IMAGE_MODEL"];
 
     /// <summary>
     /// These settings with the optional services as switched in Settings. A service's environment variable, when set,
@@ -95,6 +95,7 @@ public sealed record AppSettings(Uri? Endpoint, string? GitHubToken)
         VideoDeployment = Named("POAUTOROBO_VIDEO_MODEL", choices.Video ? choices.VideoModel : ""),
         LocalModel = Named("POAUTOROBO_LOCAL_MODEL", choices.Local ? choices.LocalModel : ""),
         EmbeddingDeployment = Named("POAUTOROBO_EMBEDDING_MODEL", choices.Meaning ? choices.EmbeddingModel : ""),
+        ImageDeployment = Named("POAUTOROBO_IMAGE_MODEL", choices.ImageModel) ?? ImageModels.Standard,
         PexelsKey = choices.StockPhotos ? PexelsKey : null,
     };
 

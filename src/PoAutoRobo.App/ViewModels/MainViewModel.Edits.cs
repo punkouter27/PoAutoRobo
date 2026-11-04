@@ -387,7 +387,8 @@ public partial class MainViewModel
         if (Episode is not { } episode || EpisodeFolder is not { } folder) return;
         try
         {
-            var notes = await _scriptWriter.ReviewAsync(episode, CancellationToken.None);
+            // A robot script is read against the passages it was written from, so a claim they do not back is noted.
+            var notes = await _scriptWriter.ReviewAsync(episode, [.. Snippets], CancellationToken.None);
             if (EpisodeFolder != folder) return; // another episode was opened meanwhile
             _notes.Clear();
             foreach (var note in notes)

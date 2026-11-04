@@ -96,6 +96,44 @@ public sealed class CostEstimateTests : IDisposable
             && r.Prompt.Contains("Teaching the R1") && r.Prompt.Contains("#22CC88") && r.Prompt.Contains("No letters")), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task An_episode_draws_its_subject_once_and_every_picture_of_it_from_that_sheet_with_no_words_and_drafts_are_costed_again_as_finals()
+    {
+        var images = Substitute.For<ImageMaker>();
+        images.Invoke(default!, default!, default).ReturnsForAnyArgs(call =>
+        {
+            File.WriteAllBytes(call.ArgAt<string>(1), Guid.NewGuid().ToByteArray());
+            return Task.CompletedTask;
+        });
+        var made = 0;
+        var visuals = new Visuals(images, new MediaCache(Path.Combine(_folder, "images")), Path.Combine(_folder, "no-host.png"), "gpt-image-1-mini")
+        {
+            Subjects = new MediaCache(Path.Combine(_folder, "subject")),
+            PictureMade = () => made++,
+        };
+        var still = ProjectStoreTests.NewClip("Crack the egg") with { HostVisible = false };
+        var card = ProjectStoreTests.NewClip("Hello") with { Visual = new VisualSpec(VisualKind.TitleCard), HostVisible = false };
+        var episode = new Episode("Dino egg", "", [still, card], 1) { Structure = BeatStructure.ToyReview, Subject = "a small green toy dinosaur with red spikes" };
+
+        Assert.True(visuals.NeedsSubjectSheet(episode));
+        Assert.Equal(2, CostEstimate.For(episode, "gpt-image-1-mini", subjectSheet: true).Pictures); // the still, and the sheet it is drawn from
+        var sheet = await visuals.SubjectSheetAsync(episode, Ct);
+        Assert.Equal(sheet, await visuals.SubjectSheetAsync(episode, Ct)); // drawn once: asking again is free
+        Assert.Equal(1, made);
+        Assert.False(visuals.NeedsSubjectSheet(episode));
+        await images.Received(1).Invoke(Arg.Is<ImageRequest>(r => r.Prompt.Contains("red spikes") && r.Prompt.Contains(Visuals.NoWords)), Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        await visuals.DrawAsync(still, Look.Comic, Ct, sheet);
+        await images.Received(1).Invoke(Arg.Is<ImageRequest>(r => r.ReferencePath == sheet && r.Prompt.EndsWith(Visuals.NoWords)), Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        // A draft is drawn again at full quality once the episode is right; until then it costs nothing more.
+        var drafted = EpisodeEditor.ApplyPicture(episode, still, ["a.png"], draft: true);
+        Assert.True(drafted.Clips[0].Draft);
+        Assert.True(CostEstimate.For(drafted, "gpt-image-1-mini").NothingToDo);
+        Assert.Equal([still.Id], CostEstimate.For(drafted, "gpt-image-1-mini", finals: true).ClipIds);
+        Assert.False(EpisodeEditor.ApplyPicture(drafted, still, ["b.png"]).Clips[0].Draft);
+    }
+
     // ---- What has been spent ----
 
     [Fact]

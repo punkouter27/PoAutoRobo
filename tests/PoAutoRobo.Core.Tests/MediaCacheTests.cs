@@ -150,6 +150,33 @@ public sealed class MediaCacheTests : IDisposable
         Assert.Contains("\u0001\u0002\u0003", handler.Sent); // the sheet's bytes
     }
 
+    [Fact]
+    public async Task Flux_is_sent_no_quality_count_or_background_and_every_request_says_its_length_up_front()
+    {
+        var flux = Live with { ImageDeployment = ImageModels.Flux };
+        var handler = new Scripted((HttpStatusCode.OK, Reply([1]), null));
+        AzureImageGen Gen(AppSettings settings) => new(settings, new HttpClient(handler));
+
+        await Gen(flux).GenerateAsync(new ImageRequest("A toy dinosaur", null, Transparent: true), Output, Ct);
+        Assert.Contains("/deployments/FLUX.1-Kontext-pro/images/generations", handler.Request!.RequestUri!.AbsolutePath);
+        Assert.Equal("""{"prompt":"A toy dinosaur","size":"1536x1024"}""", handler.Sent);
+        Assert.NotNull(handler.Request.Content!.Headers.ContentLength); // FLUX turns a request away without it
+
+        await Gen(flux).GenerateAsync(new ImageRequest("The same dinosaur", _sheet), Output, Ct);
+        Assert.DoesNotContain("name=n", handler.Sent.Replace("\"", ""));
+        Assert.DoesNotContain("name=quality", handler.Sent.Replace("\"", ""));
+
+        await Gen(Live).GenerateAsync(new ImageRequest("A toy dinosaur", null), Output, Ct);
+        Assert.Contains("\"quality\":\"medium\"", handler.Sent);
+        Assert.NotNull(handler.Request.Content!.Headers.ContentLength);
+
+        // Priced and offered by what it can do: no cheaper draft, and nothing see-through for a layered picture.
+        Assert.Equal((CostEstimate.FluxPicturePrice, CostEstimate.FluxPicturePrice), (CostEstimate.PriceOf(ImageModels.Flux, Quality.Low), CostEstimate.PriceOf(ImageModels.Flux)));
+        Assert.False(new Visuals((_, _, _) => Task.CompletedTask, new MediaCache(_folder), _sheet, ImageModels.Flux).CanMake(VisualKind.Parallax));
+        Assert.True(new Visuals((_, _, _) => Task.CompletedTask, new MediaCache(_folder), _sheet, ImageModels.Standard).CanMake(VisualKind.Parallax));
+        Assert.Equal(ImageModels.Flux, (AppSettings.Offline.Using(new ServiceChoices(ImageModel: ImageModels.Flux))).ImageDeployment);
+    }
+
     private async Task A_service_refusal_is_reported_in_its_own_words_is_not_retried_and_writes_no_file()
     {
         var handler = new Scripted((HttpStatusCode.BadRequest, """{ "error": { "code": "content_policy_violation", "message": "Your request was rejected by the safety system." } }""", null));

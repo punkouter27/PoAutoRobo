@@ -6,12 +6,17 @@ namespace PoAutoRobo.Core.Library;
 /// </summary>
 public sealed class MediaCache(string folder)
 {
+    /// <summary>True when what these key parts name is already made, so asking for it is free.</summary>
+    public bool Has(IEnumerable<string> keyParts, string extension) => File.Exists(PathFor(keyParts, extension));
+
+    private string PathFor(IEnumerable<string> keyParts, string extension) =>
+        Path.Combine(folder, Files.TextHash(string.Join('\u001f', keyParts))[..32] + extension);
+
     /// <param name="keyParts">Everything that affects the result: model, size, prompt, reference content.</param>
     /// <param name="create">Writes the media to the path it is given. Only called when nothing is cached.</param>
     public async Task<string> GetOrCreateAsync(IEnumerable<string> keyParts, string extension, Func<string, Task> create)
     {
-        var key = Files.TextHash(string.Join('\u001f', keyParts))[..32];
-        var path = Path.Combine(folder, key + extension);
+        var path = PathFor(keyParts, extension);
         if (File.Exists(path))
             return path;
 

@@ -6,8 +6,13 @@ namespace PoAutoRobo.Core.Library;
 /// <param name="Footage">The owner's own clips of the robot, each placed in one clip of the episode.</param>
 public sealed record Lesson(string Taught, string WentWrong, BeatStructure Structure, IReadOnlyList<FootageNote> Footage)
 {
-    /// <summary>The lesson as one piece of text: what is saved as the episode's topic and what the model reads.</summary>
-    public string Topic => WentWrong.Trim().Length > 0 ? $"{Taught.Trim()}\n\nWhat went wrong: {WentWrong.Trim()}" : Taught.Trim();
+    /// <summary>
+    /// The lesson as one piece of text: what is saved as the episode's topic and what the model reads. In the kids'
+    /// series the second box holds the funny moments, not what went wrong.
+    /// </summary>
+    public string Topic => WentWrong.Trim().Length > 0
+        ? $"{Taught.Trim()}\n\n{(BeatPlan.ShowOf(Structure) == Show.Kids ? "Funny moments" : "What went wrong")}: {WentWrong.Trim()}"
+        : Taught.Trim();
 
     /// <summary>The series so far, a line to each episode ("#3 · Standing up: …"), so this one can build on them.</summary>
     public IReadOnlyList<string> Earlier { get; init; } = [];

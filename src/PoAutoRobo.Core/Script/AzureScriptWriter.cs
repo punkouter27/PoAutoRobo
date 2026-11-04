@@ -34,9 +34,10 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
     private sealed record TeaserDto(string Hook, List<MomentDto> Moments);
     private sealed record TeasersDto(List<TeaserDto> Teasers);
     private sealed record PlannedClipDto(string Title, string Kind, string About, string Beat = "", int Footage = 0, bool Host = false);
-    private sealed record OutlineDto(string Title, List<PlannedClipDto> Clips);
+    private sealed record OutlineDto(string Title, List<PlannedClipDto> Clips, string Subject = "");
     private sealed record SearchDto(List<string> Terms);
     private sealed record HostDto(bool Same, string Difference);
+    private sealed record LetteringDto(bool Lettered, string Text);
     private sealed record ShotDto(string Beat, string Shot);
     private sealed record ShotsDto(List<ShotDto> Shots);
 
@@ -48,6 +49,8 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
 
     /// <summary>Told what each request used: its name in the spend log, how many tokens, and their price when the rates are known.</summary>
     public Action<string, int, decimal>? Used { get; set; }
+
+    public Show Show { get; set; }
 
     /// <summary>Which picture types can be made on this computer; the model is offered only those.</summary>
     public Func<VisualKind, bool> CanMake { get; set; } = _ => true;
@@ -152,9 +155,10 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
     public async Task<Episode> WriteEpisodeAsync(Lesson lesson, IReadOnlyList<GroundingSnippet> grounding, EpisodeLength length, CancellationToken ct, IProgress<IReadOnlyList<string>>? clipsWritten = null)
     {
         var beats = BeatPlan.Beats(lesson.Structure);
+        var show = BeatPlan.ShowOf(lesson.Structure);
         var request = Request(lesson, grounding, length, beats);
         IReadOnlyList<KindInfo> kinds = [.. Visuals.Kinds.Where(k => CanMake(k.Kind))];
-        var (system, schema) = (ScriptSchemas.OutlineSystem(kinds), ScriptSchemas.Outline(kinds, beats));
+        var (system, schema) = (ScriptSchemas.OutlineSystem(kinds, show), ScriptSchemas.Outline(kinds, beats));
 
         // A plan is short, so it comes back quickly. Too many clips are simply trimmed below. Too few is topped up
         // once, asking only for the clips that are missing so the ones already planned are kept.
@@ -171,19 +175,20 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
         if (outline.Clips.Count < length.MinClips)
             throw new InvalidDataException($"The script came back with only {outline.Clips.Count} clips. Please try again.");
 
-        var (title, written) = await WriteClipsAsync(request, outline, kinds, lesson.Footage, length, clipsWritten, ct);
+        var subject = outline.Subject?.Trim() is { Length: > 0 } said ? said : null;
+        var (title, written) = await WriteClipsAsync(request, outline, kinds, lesson.Footage, length, show, clipsWritten, ct);
         var footage = lesson.Footage;
         var clips = written.Select(c =>
         {
             var clip = new Clip(
                 Guid.NewGuid(), c.Title, Tier.B,
                 new Dictionary<Tier, TierScript> { [Tier.B] = new(c.B.Dialogue, c.B.VisualPrompt, c.B.Pose) },
-                new VisualSpec(Visuals.KindFor(c.Kind)), HostVisible: c.Host)
+                new VisualSpec(Visuals.KindFor(c.Kind)), HostVisible: c.Host && show == Show.Robot) // the kids' series has no presenter on screen
             { Beat = c.Beat };
             return c.Footage >= 1 && c.Footage <= footage.Count ? BeatPlan.WithFootage(clip, footage[c.Footage - 1]) : clip;
         }).ToList();
         // The model's beats and footage numbers are not trusted further than this: the plan is held to its structure.
-        var episode = new Episode(title, lesson.Topic, clips, MixSeed: Random.Shared.Next()) { Structure = lesson.Structure };
+        var episode = new Episode(title, lesson.Topic, clips, MixSeed: Random.Shared.Next()) { Structure = lesson.Structure, Subject = subject };
         return BeatPlan.Repair(episode, footage, length.MaxClips);
     }
 
@@ -227,7 +232,7 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
     /// </summary>
     /// <param name="request">The request the plan was made from: the number of clips, the lesson and the references.</param>
     private async Task<(string Title, IReadOnlyList<ClipDto> Clips)> WriteClipsAsync(
-        string request, OutlineDto outline, IReadOnlyList<KindInfo> kinds, IReadOnlyList<FootageNote> footage, EpisodeLength length, IProgress<IReadOnlyList<string>>? clipsWritten, CancellationToken ct)
+        string request, OutlineDto outline, IReadOnlyList<KindInfo> kinds, IReadOnlyList<FootageNote> footage, EpisodeLength length, Show show, IProgress<IReadOnlyList<string>>? clipsWritten, CancellationToken ct)
     {
         // Each clip is a request of its own, so only as many are written as the length allows. Clips that show the
         // owner's footage are always written; the others fill the room left.
@@ -257,7 +262,7 @@ public sealed partial class AzureScriptWriter(AppSettings settings, JsonChat cha
                 Interlocked.Increment(ref asked);
                 try
                 {
-                    clips[i] = new ClipDto(clip.Title, await Ask<TierDto>(settings.ChatDeployment, ScriptSchemas.ClipSystem, mine.ToString(), "tier", ScriptSchemas.Tier, ct), clip.Kind, clip.Beat, clip.Footage, clip.Host);
+                    clips[i] = new ClipDto(clip.Title, await Ask<TierDto>(settings.ChatDeployment, ScriptSchemas.ClipSystem(show), mine.ToString(), "tier", ScriptSchemas.Tier, ct), clip.Kind, clip.Beat, clip.Footage, clip.Host);
                 }
                 catch (ScriptDeclinedException)
                 {

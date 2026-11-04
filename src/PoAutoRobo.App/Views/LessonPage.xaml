@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:PoAutoRobo.App.Views"
     xmlns:app="using:PoAutoRobo.App"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:vm="using:PoAutoRobo.App.ViewModels"
     xmlns:library="using:PoAutoRobo.Core.Library">
     <!-- Left: the open episode's lesson, or the next one being started. Right: carry on with something saved. -->
@@ -43,7 +44,7 @@
                     <TextBlock Text="This episode" Style="{StaticResource QuietText}" />
                     <TextBlock Text="{x:Bind ViewModel.EpisodeTitle, Mode=OneWay}" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap" />
                     <TextBlock Text="{x:Bind ViewModel.OpenNumberText, Mode=OneWay}" Style="{StaticResource QuietText}" Visibility="{x:Bind app:Ui.ShowText(ViewModel.OpenNumberText), Mode=OneWay}" />
-                    <TextBlock Text="What I taught it" Style="{StaticResource SectionHeading}" />
+                    <TextBlock Text="{x:Bind ViewModel.OpenTopicHeading, Mode=OneWay}" Style="{StaticResource SectionHeading}" />
                     <TextBlock x:Name="OpenTopicText" Text="{x:Bind ViewModel.OpenTopic, Mode=OneWay}" TextWrapping="Wrap" IsTextSelectionEnabled="True"
                                ToolTipService.ToolTip="What this episode's script was written from, as it was typed in. To change what the episode says, edit its clips on the Clips step." />
                     <TextBlock Text="My footage" Style="{StaticResource SectionHeading}" />
@@ -52,7 +53,7 @@
             </ScrollViewer>
             <Button x:Name="NewEpisodeButton" Grid.Row="1" MinHeight="44" HorizontalAlignment="Stretch" Command="{x:Bind ViewModel.NewLessonCommand}"
                     AutomationProperties.Name="New episode"
-                    ToolTipService.ToolTip="Start the next episode: say what you taught the R1, add your films and write its script. This episode stays saved, and stays open until the new script is written. Free until you write the script.">
+                    ToolTipService.ToolTip="Start the next episode, of either series: say what it is about, add your films and write its script. This episode stays saved, and stays open until the new script is written. Free until you write the script.">
                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
                     <SymbolIcon Symbol="Add" />
                     <TextBlock Text="New episode" />
@@ -76,21 +77,31 @@
                             <Run Text="← Back to " /><Run Text="{x:Bind ViewModel.EpisodeTitle, Mode=OneWay}" />
                         </TextBlock>
                     </HyperlinkButton>
+                    <!-- Which series the next episode is for: each has its own brand kit, shape and numbering -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Kind of video" />
+                        <controls:Segmented x:Name="ShowSelector" SelectedIndex="{x:Bind ViewModel.LessonShowIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Kind of video"
+                                            IsEnabled="{x:Bind app:Ui.Not(ViewModel.IsWorking), Mode=OneWay}"
+                                            ToolTipService.ToolTip="Robot lesson: an episode of the R1 series, teaching it one skill. Kids' video: an episode of the kids' series, your son playing, told by a cheerful narrator for young children and uploaded as made for kids. Each has its own intro, outro, look and episode numbers, set on the Series step. Switching costs nothing.">
+                            <controls:SegmentedItem Content="Robot lesson" />
+                            <controls:SegmentedItem Content="Kids' video" />
+                        </controls:Segmented>
+                    </StackPanel>
                     <NumberBox x:Name="NumberBox" Header="Episode" Minimum="1" Maximum="999" SpinButtonPlacementMode="Compact" MinWidth="110" HorizontalAlignment="Left"
                                Value="{x:Bind ViewModel.EpisodeNumber, Mode=TwoWay}" ToolTipService.ToolTip="Where this episode comes in the series. The next number is filled in; change it to redo or skip one." />
-                    <TextBox x:Name="TaughtBox" Header="What I taught it" PlaceholderText="Walking up three stairs without the handrail"
-                             ToolTipService.ToolTip="What the R1 learned in this episode. A sentence is enough; notes or code also work. Ctrl+Enter writes the script."
+                    <TextBox x:Name="TaughtBox" Header="{x:Bind ViewModel.TaughtHeader, Mode=OneWay}" PlaceholderText="{x:Bind ViewModel.TaughtPlaceholder, Mode=OneWay}"
+                             ToolTipService.ToolTip="{x:Bind ViewModel.TaughtTip, Mode=OneWay}"
                              Text="{x:Bind ViewModel.TopicInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxHeight="220" MaxLength="8000" ScrollViewer.VerticalScrollBarVisibility="Auto" />
                     <TextBlock x:Name="TopicCountText" Text="{x:Bind ViewModel.TopicCount, Mode=OneWay}" Style="{StaticResource QuietText}" Margin="0,-6,0,0" AutomationProperties.LiveSetting="Polite" />
-                    <TextBox x:Name="WentWrongBox" Header="What went wrong (optional)" PlaceholderText="It leaned back and sat down on the second step"
-                             ToolTipService.ToolTip="What went wrong along the way, in a sentence or two. It goes to the script writer with what you taught, so the episode can tell that part of the story. Leave it empty if nothing did."
+                    <TextBox x:Name="WentWrongBox" Header="{x:Bind ViewModel.WentWrongHeader, Mode=OneWay}" PlaceholderText="{x:Bind ViewModel.WentWrongPlaceholder, Mode=OneWay}"
+                             ToolTipService.ToolTip="{x:Bind ViewModel.WentWrongTip, Mode=OneWay}"
                              Text="{x:Bind ViewModel.WentWrongInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="140" MaxLength="2000" ScrollViewer.VerticalScrollBarVisibility="Auto" />
                     <Grid>
                         <TextBlock Text="My footage" VerticalAlignment="Center" />
                         <Button x:Name="AddFootageButton" AutomationProperties.Name="Add films" HorizontalAlignment="Right" Click="OnAddFootage" AllowDrop="True" DragOver="OnFootageDragOver" Drop="OnFootageDrop"
-                                ToolTipService.ToolTip="Add films of the robot (2 seconds to 2 minutes each), or drop them here. The script places each one in the beat its note fits.">
+                                ToolTipService.ToolTip="{x:Bind ViewModel.FootageTip, Mode=OneWay}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource GapSmall}">
                                 <SymbolIcon Symbol="Add" />
                                 <TextBlock Text="Add films" />

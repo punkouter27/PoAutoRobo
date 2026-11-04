@@ -10,7 +10,9 @@ A Windows desktop app for one YouTube series: its owner teaching a Unitree R1 on
 and the owner's own films it writes a script in fixed beats, records the voice (or keeps a film's own sound), makes a
 picture for each other clip, wraps the episode in the series' intro and outro, and renders it with FFmpeg, plus
 ten-second upright teasers. Music plays only over the intro and outro, never under the clips, and every brand-kit
-choice left unset has a default the app makes. **WinUI 3, unpackaged, .NET 10. Not Blazor and not a
+choice left unset has a default the app makes. A second series, kids' videos of the owner's little boy playing
+(toy reviews and highlights, for young children), runs beside it: an episode's `Show` follows from its shape
+(`BeatPlan.ShowOf`), and each show has its own brand kit, prompts and numbering. **WinUI 3, unpackaged, .NET 10. Not Blazor and not a
 web app:** there are no routes, components or browser APIs here. `AGENTS.md` is the working agreement for agents
 (branching, commit wording, checking the app starts, how replies are summarised); read it too.
 
@@ -62,13 +64,15 @@ Warnings are errors, analyzer and style rules included, and so is a package with
   and its own pipe, so a disguised playlist cannot reach the network.
   Anything new that holds a path (see `Clip.AllMedia`) must also be handled there, in `ProjectStore.Duplicate`, and in
   `EpisodeBuilder.UnusedMedia`. The brand kit is not an episode's: it keeps bare file names of its own copies in
-  `%LOCALAPPDATA%\PoAutoRobo\series`, and its music is copied into an episode's `imports` when used there.
+  `%LOCALAPPDATA%\PoAutoRobo\series` (the kids' kit in `series-kids`), and its music is copied into an episode's `imports` when used there.
 - **Nothing that costs money happens without being asked for**, and a batch only after its cost is confirmed and
   the monthly budget checked (`OverBudget`). Spending with no episode open (the host, the logo) is logged in the host
   folder and counts toward the month too; spending from deleted episodes does not. Generated media is cached by everything that went into the request
   (`MediaCache`), so asking again is free; a deliberate retry is a new *take* (`VisualSpec.Take`).
 - **Text that did not come from the user is fenced** before it reaches a model: repository passages and anything a
   model wrote earlier, such as the finished script teasers are cut from. Use `AzureScriptWriter.Fenced`; the prompts in `ScriptSchemas` say not to obey it.
+- **Nothing is ever drawn of the boy in a kids' video**: he appears only in the owner's own films. The kids' prompts
+  in `ScriptSchemas` say so, keep out anything that says who or where he is, and the upload is marked made for kids.
 - **Model-written JavaScript runs only in `SceneRenderer`'s locked-down browser**: no network, a time limit on every
   frame. Do not loosen its flags or its page policy.
 - **Working files go under `Files.ScratchRoot`**, never the episode folder (it is usually cloud-synced) and never
@@ -123,7 +127,7 @@ these environment variables overrides a default, and a service's variable wins o
 | --- | --- |
 | `POAUTOROBO_VAULT` | Key Vault address |
 | `POAUTOROBO_CHAT_MODEL`, `POAUTOROBO_FAST_CHAT_MODEL` | Script model deployments |
-| `POAUTOROBO_IMAGE_MODEL` | Picture model deployment |
+| `POAUTOROBO_IMAGE_MODEL` | Picture model deployment, over the *Picture model* choice in Settings: `gpt-image-1-mini` (standard) or `FLUX.1-Kontext-pro`, which takes no quality and draws nothing see-through |
 | `POAUTOROBO_VIDEO_MODEL` | Video model deployment; unset means AI video is not offered |
 | `POAUTOROBO_EMBEDDING_MODEL` | Embedding deployment; unset means passages are found by matching words alone |
 | `POAUTOROBO_LOCAL_MODEL` | A model on this computer (for example `qwen3:8b` in Ollama) for the small jobs; unset means the fast model does them |

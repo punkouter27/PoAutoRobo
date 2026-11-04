@@ -56,6 +56,7 @@ public partial class MainViewModel
             OnPropertyChanged(nameof(Step));
             OnPropertyChanged(nameof(ShowIntro));
             OnPropertyChanged(nameof(ShowTopic));
+            OnPageShown();
             OnPropertyChanged(nameof(ShowDeck));
             OnPropertyChanged(nameof(ShowPreview));
             OnPropertyChanged(nameof(ShowPublish));
@@ -70,6 +71,42 @@ public partial class MainViewModel
     public bool ShowIntro => Step == SeriesStep && !IsCreating;
 
     public bool ShowTopic => Step == LessonStep && !IsCreating;
+
+    // The toolkit's Segmented, the first time it is shown, goes back to the first choice it was ever given: a series
+    // switched while its page was hidden would be switched back. So the choices on the Series and Lesson pages read as
+    // none until their page has been shown, and the first one a control is given is the one in force.
+    private bool _introShown, _lessonShown;
+
+    private bool IntroShown => _introShown |= ShowIntro;
+
+    private bool LessonShown => _lessonShown |= ShowTopic;
+
+    private void OnPageShown()
+    {
+        if (!_introShown && IntroShown)
+        {
+            OnPropertyChanged(nameof(SeriesShowIndex));
+            OnPropertyChanged(nameof(SeriesStructureIndex));
+        }
+        if (!_lessonShown && LessonShown)
+            OnPropertyChanged(nameof(LessonShowIndex));
+    }
+
+    partial void OnIsCreatingChanged(bool value) => OnPageShown();
+
+    /// <summary>The series on the Series step's switch; none until the page is first shown.</summary>
+    public int SeriesShowIndex
+    {
+        get => IntroShown ? ShowIndex : -1;
+        set => ShowIndex = value;
+    }
+
+    /// <summary>The series on the Lesson step's switch; none until the page is first shown.</summary>
+    public int LessonShowIndex
+    {
+        get => LessonShown ? ShowIndex : -1;
+        set => ShowIndex = value;
+    }
 
     public bool ShowDeck => Step == ClipsStep || IsCreating;
 
@@ -129,8 +166,9 @@ public partial class MainViewModel
         var films = written ? OpenFilms : Footage.Count;
         return
         [
-            new("What you taught", typed || written),
-            new(films == 0 ? "Films" : $"Films · {films}", films > 0, Optional: true),
+            new(IsKids ? "What he plays with" : "What you taught", typed || written),
+            // A kids' video is made of his films: without one, the script can only talk about the toy.
+            new(films == 0 ? "Films" : $"Films · {films}", films > 0, Optional: !IsKids),
             new("Write the script", written),
         ];
     }

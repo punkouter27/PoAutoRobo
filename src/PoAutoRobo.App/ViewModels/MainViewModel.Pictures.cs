@@ -17,7 +17,12 @@ public partial class MainViewModel
     /// <summary>The open episode's picture style, given it by the series as it was made or by Use the series look.</summary>
     private Look Look => Episode?.Look ?? Look.Comic;
 
-    private Visuals? CurrentVisuals => _visualsFor?.Invoke(EpisodeFolder ?? AppPaths.Host, Quality);
+    private Visuals? CurrentVisuals => VisualsAt(Quality);
+
+    private Visuals? VisualsAt(Quality quality) => _visualsFor?.Invoke(EpisodeFolder ?? AppPaths.Host, quality);
+
+    /// <summary>Pictures drawn at this quality are drafts, to be drawn again at full quality: only where the model has a cheaper draft.</summary>
+    private bool IsDraft(Quality quality) => quality == Quality.Low && ImageModels.HasQuality(_imageModel);
 
     /// <summary>What making the host candidates costs, said before they are made.</summary>
     public string HostCandidatesCost => CostEstimate.PriceOf(_imageModel, Quality) is { } each
@@ -82,7 +87,7 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanGenerateAll))]
     private async Task GenerateAllAsync()
     {
-        var estimate = CostEstimate.For(Episode!, _imageModel, Quality);
+        var estimate = CostEstimate.For(Episode!, _imageModel, Quality, subjectSheet: CurrentVisuals?.NeedsSubjectSheet(Episode!) == true);
         ErrorMessage = null;
         if (estimate.NothingToDo)
         {
@@ -99,7 +104,7 @@ public partial class MainViewModel
             return;
 
         (int Made, List<string> Failures, string? Halted) drawn = (0, [], null);
-        var finished = await RunActivityAsync("Generating pictures", async ct => drawn = await DrawAllAsync(estimate, ct));
+        var finished = await RunActivityAsync("Generating pictures", async ct => drawn = await DrawAllAsync(estimate, Quality, ct));
         // A clip that fails is recorded and never stops the batch, so "not finished" here means stopped by the user.
         StatusMessage = finished ? $"Pictures are ready for {drawn.Made} clips. {drawn.Halted}".TrimEnd() : $"Stopped. Pictures are ready for {drawn.Made} clips.";
         ReportFailures(drawn.Failures);
@@ -115,8 +120,14 @@ public partial class MainViewModel
     /// and agreeing to one figure is not agreeing to more.
     /// </summary>
     /// <returns>Halted: why the batch stopped short, said for the user; null when it drew every clip it was asked for.</returns>
-    private async Task<(int Made, List<string> Failures, string? Halted)> DrawAllAsync(CostEstimate estimate, CancellationToken ct)
+    private async Task<(int Made, List<string> Failures, string? Halted)> DrawAllAsync(CostEstimate estimate, Quality quality, CancellationToken ct)
     {
+        // The subject sheet first, alone: the clips drawn side by side would each pay for it otherwise.
+        if (Episode is { } episode && VisualsAt(quality) is { } visuals && estimate.ClipIds.Any(id => episode.Clips.FirstOrDefault(c => c.Id == id) is { } c && Visuals.UsesSubject(c.Visual.Kind)))
+        {
+            ReportActivity("Drawing the reference picture every picture is drawn from", 0);
+            await visuals.SubjectSheetAsync(episode, ct);
+        }
         var failures = new List<string>();
         var made = 0;
         var started = 0;
@@ -130,7 +141,7 @@ public partial class MainViewModel
             ct.ThrowIfCancellationRequested();
             if (halted is not null) return;
             var clip = Episode?.Clips.FirstOrDefault(c => c.Id == id);
-            var price = clip is null ? 0 : CostEstimate.PriceOf(clip, _imageModel, Quality);
+            var price = clip is null ? 0 : CostEstimate.PriceOf(clip, _imageModel, quality);
             if (!estimate.Allows(PictureSpending() - before + drawing, price))
             {
                 halted = $": the next picture would have taken the spending past the {SpendLog.Money(estimate.Dollars ?? 0)} you agreed to. Generate pictures again to see what the rest cost.";
@@ -147,7 +158,7 @@ public partial class MainViewModel
             string? failure;
             try
             {
-                failure = await GenerateOneAsync(id, false, ct);
+                failure = await GenerateOneAsync(id, false, ct, quality);
             }
             finally
             {
@@ -199,10 +210,12 @@ public partial class MainViewModel
             Edit(e => EpisodeEditor.UseEarlierTake(e, card.Id, index));
     }
 
+    /// <param name="quality">The quality to draw at; the Settings choice when null.</param>
     /// <returns>Null on success, otherwise why this clip has no picture.</returns>
     /// <exception cref="OperationCanceledException">The user stopped it.</exception>
-    private async Task<string?> GenerateOneAsync(Guid clipId, bool anotherTake, CancellationToken ct)
+    private async Task<string?> GenerateOneAsync(Guid clipId, bool anotherTake, CancellationToken ct, Quality? quality = null)
     {
+        var drawnAt = quality ?? Quality;
         if (Episode?.Clips.FirstOrDefault(c => c.Id == clipId) is not { } clip)
             return "This clip is no longer in the episode.";
         if (anotherTake) clip = EpisodeEditor.NextTake(clip);
@@ -211,21 +224,26 @@ public partial class MainViewModel
         var asked = DateTime.UtcNow;
         try
         {
+            // Drawn from the episode's reference picture, so the robot or the toy looks the same in every clip.
+            var visuals = VisualsAt(drawnAt)!;
+            var sheet = Visuals.UsesSubject(clip.Visual.Kind) && Episode is { } episode ? await visuals.SubjectSheetAsync(episode, ct) : null;
             // When the picture service will not draw the clip as described, it is given a picture it will, and told so.
-            var (drawn, paths, change) = await CurrentVisuals!.DrawOrSubstituteAsync(clip, Look, ct);
+            var (drawn, paths, change) = await visuals.DrawOrSubstituteAsync(clip, Look, ct, sheet);
             // Footage and animations have no picture of their own; a frame is taken to stand for them on the card.
             if (FfmpegAvailable)
                 foreach (var video in paths.Where(path => EpisodeBuilder.VideoExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase) && !File.Exists(Clip.PosterFor(path))))
                     await _builder.PosterAsync(video, ct);
             await CheckHostAsync(drawn, paths, asked, ct);
+            await CheckLetteringAsync(drawn, paths, asked, ct);
             // Attached to the clip as it is now: footage, a new picture type or changed words since the request win.
+            var draft = IsDraft(drawnAt);
             if (change is null)
             {
-                Edit(e => EpisodeEditor.ApplyPicture(e, clip, paths));
+                Edit(e => EpisodeEditor.ApplyPicture(e, clip, paths, draft));
             }
             else
             {
-                Edit(e => EpisodeEditor.ApplySubstitute(e, clip, drawn, paths));
+                Edit(e => EpisodeEditor.ApplySubstitute(e, clip, drawn, paths, draft));
                 Note(change);
             }
             return null;
@@ -267,6 +285,65 @@ public partial class MainViewModel
         {
             // A help on top of the picture, which is made either way.
         }
+    }
+
+    /// <summary>
+    /// Says when a picture made just now has words drawn into it, which picture models add, misspelt, whatever they are
+    /// told, so another take can be asked for. A look costs a fraction of a cent; the take is the user's to ask for.
+    /// </summary>
+    private async Task CheckLetteringAsync(Clip clip, IReadOnlyList<string> paths, DateTime asked, CancellationToken ct)
+    {
+        if (clip.Visual.Kind is not (VisualKind.Still or VisualKind.MultiPanel or VisualKind.Parallax)) return;
+        foreach (var picture in paths.Where(p => Path.GetExtension(p).Equals(".png", StringComparison.OrdinalIgnoreCase) && File.Exists(p) && File.GetCreationTimeUtc(p) >= asked))
+        {
+            try
+            {
+                if (await _scriptWriter.CheckLetteringAsync(picture, ct) is { } text)
+                {
+                    Note($"The picture for “{clip.Title}” has words drawn into it (“{text}”). Another take may leave them out.");
+                    return; // one note a clip is enough
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                return; // a help on top of the picture, which is made either way
+            }
+        }
+    }
+
+    // ---- Draft pictures, then the final ones ----
+
+    /// <summary>The open episode has draft pictures still to be drawn again at full quality.</summary>
+    public bool HasDraftPictures => Episode?.Clips.Any(c => c.Draft) == true;
+
+    public string DraftPicturesText => Episode?.Clips.Count(c => c.Draft) is int n and > 0
+        ? $"{(n == 1 ? "1 clip shows a draft picture" : $"{n} clips show draft pictures")}. Once the draft video is right, draw them again at full quality for the master video."
+        : "";
+
+    private bool CanMakeFinalPictures => HasDraftPictures && PicturesAvailable && !IsWorking && !GeneratePictureCommand.IsRunning && !AnotherTakeCommand.IsRunning;
+
+    /// <summary>
+    /// Draws every draft picture again at full quality, after saying what that costs and checking the month's budget:
+    /// the second half of draft first, final once the episode is right. The words and picture types stay as they are.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanMakeFinalPictures))]
+    private async Task MakeFinalPicturesAsync()
+    {
+        var visuals = VisualsAt(Quality.Medium);
+        var estimate = CostEstimate.For(Episode!, _imageModel, Quality.Medium, finals: true, subjectSheet: visuals?.NeedsSubjectSheet(Episode!) == true);
+        ErrorMessage = null;
+        if (estimate.NothingToDo) return;
+        if (OverBudget(estimate.Dollars ?? 0) is { } refusal)
+        {
+            ErrorMessage = refusal;
+            return;
+        }
+        if (!await ConfirmSpend("Draw the final pictures?", $"{estimate.Summary} Each draft picture is drawn again at full quality, from the same description, for the master video.", "Draw them", estimate.Dollars ?? 0) || !CanMakeFinalPictures)
+            return;
+        (int Made, List<string> Failures, string? Halted) drawn = (0, [], null);
+        var finished = await RunActivityAsync("Drawing the final pictures", async ct => drawn = await DrawAllAsync(estimate, Quality.Medium, ct));
+        StatusMessage = finished ? $"Final pictures are ready for {drawn.Made} clips. Make the preview again to watch them. {drawn.Halted}".TrimEnd() : $"Stopped. Final pictures are ready for {drawn.Made} clips.";
+        ReportFailures(drawn.Failures);
     }
 
     /// <summary>Draws three designs for the host, after saying what they cost and checking the month's budget.</summary>

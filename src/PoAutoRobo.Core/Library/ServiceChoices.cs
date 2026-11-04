@@ -8,11 +8,13 @@ namespace PoAutoRobo.Core.Library;
 /// <param name="StockPhotos">Photographs from Pexels are offered, with the Pexels key from the vault.</param>
 /// <param name="Local">A model on this computer does the small jobs, in place of the fast model.</param>
 /// <param name="Meaning">Passages of the documentation are found by meaning as well as by words.</param>
+/// <param name="ImageModel">The picture model's deployment: GPT-image as standard, or FLUX where the resource has that instead.</param>
 public sealed record ServiceChoices(
     bool Video = false, string VideoModel = "sora-2",
     bool StockPhotos = true,
     bool Local = false, string LocalModel = "qwen3:8b",
-    bool Meaning = false, string EmbeddingModel = "text-embedding-3-small")
+    bool Meaning = false, string EmbeddingModel = "text-embedding-3-small",
+    string ImageModel = ImageModels.Standard)
 {
     public static ServiceChoices Load(string path) => JsonFile.Load(path, new ServiceChoices());
 

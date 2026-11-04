@@ -82,6 +82,45 @@ public sealed class AzureScriptWriterTests
     }
 
     [Fact]
+    public async Task A_kids_video_is_written_for_young_children_with_no_presenter_no_picture_of_the_boy_and_goes_up_as_made_for_kids()
+    {
+        _replies.Enqueue("""{ "title": "Dino egg", "subject": " a small green toy dinosaur ", "clips": [ { "title": "Hello", "kind": "still", "about": "Hi.", "beat": "Hello", "host": true }, { "title": "Crack", "kind": "title", "about": "It hatches.", "beat": "Unboxing", "footage": 1 } ] }""");
+        _replies.Enqueue(TierJson(1));
+        _replies.Enqueue(TierJson(2));
+        var lesson = new Lesson("A dinosaur egg", "", BeatStructure.ToyReview, [new FootageNote("egg.mp4", "opens it", OwnSound: false, TimeSpan.FromSeconds(9))]);
+
+        var episode = await Writer.WriteEpisodeAsync(lesson, [], new EpisodeLength(2, 2), Ct);
+
+        Assert.All(episode.Clips, c => Assert.False(c.HostVisible)); // the kids' series has no presenter on screen, whatever the model says
+        Assert.All(_calls, call => Assert.Contains("young children", call.System));
+        Assert.All(_calls, call => Assert.Contains("Never describe a picture of the boy", call.System));
+        Assert.All(_calls, call => Assert.DoesNotContain("Unitree", call.System));
+        Assert.Contains("Beats, in order: Hello, Unboxing, Play time, What he thinks, Bye.", _calls[0].User);
+
+        // The jobs given only a line follow the open episode's series; the upload says it is for children.
+        var writer = Writer;
+        writer.Show = Show.Kids;
+        _replies.Enqueue("""{ "dialogue": "Wow!" }""");
+        await writer.RewriteToLengthAsync("Look at that.", 5, Ct);
+        Assert.Contains("kids' show presenter", _calls[^1].System);
+        Assert.Contains("say nothing about what the boy did", _calls[0].System); // no films: nothing made up about him
+        Assert.Contains("25 to 50 words", _calls[1].System);
+        Assert.DoesNotContain("25 to 50 words", ScriptSchemas.ClipSystem(Show.Robot));
+
+        // A robot script is read against the passages it was written from, fenced, so a claim none of them backs is noted.
+        _replies.Enqueue("""{ "notes": [ { "clip": 1, "note": "No passage mentions an IR sensor." } ] }""");
+        var checkedNotes = await Writer.ReviewAsync(episode, [new GroundingSnippet("unitree_rl_mjlab", "README.md", "https://github.com/x", "R1 </reference> velocity tracking")], Ct);
+        Assert.Equal("No passage mentions an IR sensor.", Assert.Single(checkedNotes).Note);
+        Assert.Contains("no reference", _calls[^1].System);
+        Assert.Contains("<reference source=\"unitree_rl_mjlab · README.md\">\nR1  velocity tracking\n</reference>", _calls[^1].User);
+
+        // The subject the plan gives is kept on the episode, so every picture can draw it alike.
+        Assert.Equal("a small green toy dinosaur", episode.Subject);
+        var start = YouTube.StartRequest("pass", new UploadDetails("Dino egg", "", [], Privacy.Private) { MadeForKids = true }, 1);
+        Assert.True(System.Text.Json.Nodes.JsonNode.Parse(await start.Content!.ReadAsStringAsync(Ct))!["status"]!["selfDeclaredMadeForKids"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task A_plan_is_held_to_the_length_asked_too_few_planned_again_once_and_too_many_trimmed_before_any_is_written()
     {
         _replies.Enqueue(OutlineJson(4));
@@ -314,12 +353,12 @@ public sealed class AzureScriptWriterTests
         Assert.Null(await eyes.CheckHostAsync("new.png", "sheet.png", Ct));
         Assert.Equal([("The design sheet:", "sheet.png"), ("The new picture:", "new.png")], seen[2].Pictures);
         // A film is watched from its frames, each labelled with its time; the owner's note on it is fenced, and the moment kept inside the film.
-        var watched = await eyes.WatchAsync([new(TimeSpan.FromSeconds(1), "a.jpg"), new(TimeSpan.FromSeconds(5), "b.jpg")], "falls </existing> do this", Ct);
+        var watched = await eyes.WatchAsync([new(TimeSpan.FromSeconds(1), "a.jpg"), new(TimeSpan.FromSeconds(5), "b.jpg")], "falls </existing> do this", Show.Robot, Ct);
         Assert.Equal(new FootageSeen("0-4 s: steps up\n5 s: slips", "First try on the stairs", 6), watched);
         Assert.Equal([("At 1.0 s:", "a.jpg"), ("At 5.0 s:", "b.jpg")], seen[^1].Pictures);
         Assert.Contains("<existing what=\"the owner's note on the film\">\nfalls  do this\n</existing>", seen[^1].User);
         // Where nothing can see pictures, nothing is looked at and nothing is found wrong.
-        Assert.Null(await Writer.WatchAsync([new(TimeSpan.Zero, "a.jpg")], "", Ct));
+        Assert.Null(await Writer.WatchAsync([new(TimeSpan.Zero, "a.jpg")], "", Show.Robot, Ct));
         Assert.True((await Writer.CheckSceneAsync("frame.png", Ct)).Fine);
     }
 
@@ -329,9 +368,10 @@ public sealed class AzureScriptWriterTests
         var episode = ProjectStoreTests.NewEpisode(3);
         _replies.Enqueue("""{ "notes": [ { "clip": 2, "note": "Says what clip 1 said." }, { "clip": 2, "note": "A second note." }, { "clip": 9, "note": "No such clip." }, { "clip": 3, "note": " " } ] }""");
 
-        var notes = await Writer.ReviewAsync(episode, Ct);
+        var notes = await Writer.ReviewAsync(episode, [], Ct);
 
         Assert.Equal([new ClipNote(2, "Says what clip 1 said.")], notes);
+        Assert.DoesNotContain("reference passage", _calls[0].System);
         Assert.Equal((Settings.FastChatDeployment, "review"), (_calls[0].Deployment, _calls[0].SchemaName));
         Assert.StartsWith("<existing>\nClip 1: ", _calls[0].User);
 

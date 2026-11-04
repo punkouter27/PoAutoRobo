@@ -26,7 +26,13 @@ public sealed record TeaserCut(string Picture, string Sound, TimeSpan Start, Tim
 /// there is none), and where the intro's words and mascot sit.
 /// </summary>
 /// <param name="Grain">The brand kit's film finish: grain and a soft vignette, as on every clip.</param>
-public sealed record BookendLook(string Accent, string? Logo, string? Mascot, IntroLayout Layout = IntroLayout.Side, bool Grain = false);
+/// <param name="CallToAction">The line under the channel's name in the outro. Kept to plain words: it is drawn as it is.</param>
+public sealed record BookendLook(string Accent, string? Logo, string? Mascot, IntroLayout Layout = IntroLayout.Side, bool Grain = false, string CallToAction = BookendLook.Subscribe)
+{
+    public const string Subscribe = "Subscribe for the next lesson";
+
+    public const string KidsSubscribe = "See you next playtime";
+}
 
 /// <summary>
 /// What a clip gets besides its picture: the series colour (for a title card's moving background and the light that

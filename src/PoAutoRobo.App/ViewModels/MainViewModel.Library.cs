@@ -25,7 +25,7 @@ public partial class MainViewModel
         foreach (var summary in summaries)
             Library.Add(summary);
         // The next in the series, unless the user has typed a number of their own since it was last filled in.
-        var next = ProjectStore.NextNumber(summaries);
+        var next = ProjectStore.NextNumber(summaries, CurrentShow);
         if (double.IsNaN(EpisodeNumber) || (int)EpisodeNumber == _suggestedNumber)
         {
             if ((int)EpisodeNumber != next && Step == SeriesStep) RedrawStill(); // the intro shows the next episode's number
@@ -128,9 +128,10 @@ public partial class MainViewModel
         // The series so far, so the script can build on it; read off the window's thread, as it opens every episode.
         var lesson = new Lesson(TopicInput, WentWrongInput, NextStructure, [.. Footage.Select(f => f.ToNote())])
         {
-            Earlier = await Task.Run(() => ProjectStore.SeriesBefore(AppPaths.Episodes, number), ct),
+            Earlier = await Task.Run(() => ProjectStore.SeriesBefore(AppPaths.Episodes, number, BeatPlan.ShowOf(NextStructure)), ct),
         };
         var topic = lesson.Topic;
+        var show = BeatPlan.ShowOf(lesson.Structure);
         var length = EpisodeLength.Standard;
         Skeletons = [.. Enumerable.Repeat("", length.MaxClips)];
         _lastNote = null;
@@ -144,9 +145,10 @@ public partial class MainViewModel
                 ReportActivity("Watching your films", 0.01);
                 lesson = lesson with { Footage = [.. await Task.WhenAll(lesson.Footage.Select(note => UnderstandAsync(note, ct)))] };
             }
-            // Every episode is about the R1, so every script is grounded in its official repositories.
+            // Every robot episode is about the R1, so its script is grounded in the official repositories. A kids'
+            // video has nothing in them to be grounded in.
             IReadOnlyList<GroundingSnippet> grounding = [];
-            if (_grounding is not null)
+            if (_grounding is not null && show == Show.Robot)
             {
                 ReportActivity("Reading the official repositories", 0.02);
                 grounding = await _grounding.FindAsync(topic, ct);
@@ -165,9 +167,9 @@ public partial class MainViewModel
             var episode = VisualMix.Settle(await _scriptWriter.WriteEpisodeAsync(lesson, grounding, length, ct, written), canMake) with { Number = number };
             var folder = ProjectStore.NewFolder(AppPaths.Episodes, episode.Title, number); // never on top of an earlier episode
             episode = await BringInFootageAsync(episode, lesson.Footage, folder, ct);
-            // Every episode starts in the series look, with its own copy of the series music.
-            var kit = SeriesKit.Load(AppPaths.Series);
-            var music = SeriesKit.PathOf(AppPaths.Series, kit.Music) is { } track ? await ImportAsync(track, folder, "music-" + Path.GetFileName(track), ct) : null;
+            // Every episode starts in its series' look, with its own copy of the series music.
+            var kit = SeriesKit.Load(AppPaths.SeriesFor(show), show);
+            var music = SeriesKit.PathOf(AppPaths.SeriesFor(show), kit.Music) is { } track ? await ImportAsync(track, folder, "music-" + Path.GetFileName(track), ct) : null;
             episode = EpisodeEditor.UseSeriesLook(episode, kit, music) with { Shots = [.. Shots.Select(s => s.ToShot())] };
             ProjectStore.Save(episode, folder);
             Footage.Clear(); // in the episode now; the next lesson starts with none
@@ -208,6 +210,9 @@ public partial class MainViewModel
             Snippets.Add(snippet);
         OnPropertyChanged(nameof(SnippetsHeading));
         Episode = episode;
+        // The open episode's series is the one worked on, and the one its lines are rewritten for.
+        CurrentShow = BeatPlan.ShowOf(episode.Structure);
+        _scriptWriter.Show = CurrentShow;
         ShowMaster(EpisodeBuilder.LatestMaster(folder));
         Clips.Clear();
         foreach (var clip in episode.Clips)
@@ -272,9 +277,13 @@ public partial class MainViewModel
     [RelayCommand]
     private void NewLesson() => StartingNew = true;
 
-    /// <summary>Back to the open episode's lesson; anything typed for the next one is kept for later.</summary>
+    /// <summary>Back to the open episode's lesson, and its series; anything typed for the next one is kept for later.</summary>
     [RelayCommand]
-    private void BackToOpenLesson() => StartingNew = false;
+    private void BackToOpenLesson()
+    {
+        StartingNew = false;
+        if (Episode is { } episode) CurrentShow = BeatPlan.ShowOf(episode.Structure);
+    }
 
     // ---- Housekeeping ----
 

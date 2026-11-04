@@ -112,6 +112,7 @@ public sealed class PublishTests
         Assert.Equal("Chapters\n0:00 Goal", details["snippet"]!["description"]!.GetValue<string>());
         Assert.Equal(["robots", new string('t', 480)], details["snippet"]!["tags"]!.AsArray().Select(t => t!.GetValue<string>()));
         Assert.Equal(("private", "2026-11-02T16:00:00Z"), (details["status"]!["privacyStatus"]!.GetValue<string>(), details["status"]!["publishAt"]!.GetValue<string>()));
+        Assert.False(details["status"]!["selfDeclaredMadeForKids"]!.GetValue<bool>()); // a robot episode is not made for children
         // Then the film itself, to where YouTube said, with how far it has got.
         var put = sent[2].Request;
         Assert.Equal((HttpMethod.Put, "https://upload.example/session", 3000L), (put.Method, put.RequestUri!.AbsoluteUri, sent[2].Body.Length));

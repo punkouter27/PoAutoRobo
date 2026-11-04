@@ -25,12 +25,28 @@ public static class VisualMix
     public static Episode Settle(Episode episode, Func<VisualKind, bool> canMake, int maxAiVideos = 2)
     {
         if (episode.Clips.All(c => c.Visual.Kind == VisualKind.TitleCard))
-            return Assign(episode, MixPercentages.Default);
+            return ShortCards(Assign(episode, MixPercentages.Default), canMake);
         var videos = 0;
         bool Allowed(VisualKind kind) =>
             kind is VisualKind.TitleCard or VisualKind.UserVideo || (canMake(kind) && (kind != VisualKind.AiVideo || ++videos <= maxAiVideos));
-        return episode with { Clips = [.. episode.Clips.Select(c => Allowed(c.Visual.Kind) ? c : WithKind(c, VisualKind.Still))] };
+        return ShortCards(episode with { Clips = [.. episode.Clips.Select(c => Allowed(c.Visual.Kind) ? c : WithKind(c, VisualKind.Still))] }, canMake);
     }
+
+    /// <summary>The longest a title card is shown: a chapter break, not something to sit and look at.</summary>
+    public static readonly TimeSpan LongestTitleCard = TimeSpan.FromSeconds(8);
+
+    /// <summary>
+    /// A title card whose words run longer than <see cref="LongestTitleCard"/> becomes moving text of its title where
+    /// that can be drawn, and otherwise a picture, so nobody looks at one still card for half a minute. A clip the
+    /// script writer would not write, and one picked by hand, keep theirs.
+    /// </summary>
+    private static Episode ShortCards(Episode episode, Func<VisualKind, bool> canMake) => episode with
+    {
+        Clips = [.. episode.Clips.Select(c => c.Visual is { Kind: VisualKind.TitleCard, KindLocked: false } && c.Active.Dialogue != AzureScriptWriter.LeftToWrite
+            && Durations.Estimate(c.Active.Dialogue) > LongestTitleCard
+            ? WithKind(c, canMake(VisualKind.KineticText) ? VisualKind.KineticText : VisualKind.Still)
+            : c)],
+    };
 
     /// <summary>A clip that changes kind starts clean: its old picture belongs to the kind it had.</summary>
     private static Clip WithKind(Clip clip, VisualKind kind) =>

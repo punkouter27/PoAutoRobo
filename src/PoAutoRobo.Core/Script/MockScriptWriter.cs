@@ -24,6 +24,8 @@ public sealed class MockScriptWriter : IScriptWriter
         ("What to try next", "giving a thumbs up"),
     ];
 
+    public Show Show { get; set; }
+
     private const string Filler = "That is the idea in a nutshell, and it is worth saying again in a slightly different way so it really sticks.";
 
     public Task<TierScript> WriteTierAsync(string topic, Clip clip, Tier tier, CancellationToken ct) =>
@@ -45,7 +47,7 @@ public sealed class MockScriptWriter : IScriptWriter
             return new Clip(
                 Guid.NewGuid(), title, Tier.B,
                 Enum.GetValues<Tier>().ToDictionary(t => t, t => Script(topic, title, pose, t)),
-                new VisualSpec(VisualKind.TitleCard), HostVisible: !beat.ForFootage)
+                new VisualSpec(VisualKind.TitleCard), HostVisible: !beat.ForFootage && BeatPlan.ShowOf(lesson.Structure) == Show.Robot)
             { Beat = beat.Name };
         }).ToList();
         var forFootage = clips.Where(c => beats.Single(b => b.Name == c.Beat).ForFootage).ToList();
@@ -95,12 +97,14 @@ public sealed class MockScriptWriter : IScriptWriter
     public Task<SaferPicture> RethinkPictureAsync(Clip clip, CancellationToken ct) =>
         Task.FromResult(new SaferPicture($"A clean labelled diagram about {clip.Title.ToLowerInvariant()}.", clip.Title.ToLowerInvariant()));
 
-    public Task<IReadOnlyList<ClipNote>> ReviewAsync(Episode episode, CancellationToken ct) => Task.FromResult<IReadOnlyList<ClipNote>>([]);
+    public Task<IReadOnlyList<ClipNote>> ReviewAsync(Episode episode, IReadOnlyList<GroundingSnippet> references, CancellationToken ct) => Task.FromResult<IReadOnlyList<ClipNote>>([]);
 
     // The stand-ins below cannot see pictures or answer a note, so they find nothing and change nothing.
     public Task<string> ReviseAsync(Clip clip, string note, CancellationToken ct) => Task.FromResult(clip.Active.Dialogue);
 
-    public Task<FootageSeen?> WatchAsync(IReadOnlyList<Frame> frames, string note, CancellationToken ct) => Task.FromResult<FootageSeen?>(null);
+    public Task<string?> CheckLetteringAsync(string picturePath, CancellationToken ct) => Task.FromResult<string?>(null);
+
+    public Task<FootageSeen?> WatchAsync(IReadOnlyList<Frame> frames, string note, Show show, CancellationToken ct) => Task.FromResult<FootageSeen?>(null);
 
     public Task<SceneVerdict> CheckSceneAsync(string framePath, CancellationToken ct) => Task.FromResult(new SceneVerdict(true, ""));
 

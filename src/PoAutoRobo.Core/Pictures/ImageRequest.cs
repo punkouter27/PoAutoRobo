@@ -16,6 +16,25 @@ public sealed class PictureDeclinedException(string? flagged, string? said = nul
     public string? Flagged { get; } = flagged;
 }
 
+/// <summary>
+/// What the picture models on offer can and cannot do. GPT-image is the standard; FLUX.1 Kontext pro is the other, for
+/// an Azure resource that has it instead. FLUX takes no quality and draws nothing see-through.
+/// </summary>
+public static class ImageModels
+{
+    public const string Standard = "gpt-image-1-mini";
+
+    public const string Flux = "FLUX.1-Kontext-pro";
+
+    public static bool IsFlux(string model) => model.Contains("flux", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The model can leave the background see-through, which a layered picture's front layer needs.</summary>
+    public static bool HasTransparency(string model) => !IsFlux(model);
+
+    /// <summary>The model draws better or worse for the asking, so a cheaper draft is worth having.</summary>
+    public static bool HasQuality(string model) => !IsFlux(model);
+}
+
 /// <summary>Makes one picture and saves it as a PNG at <paramref name="outputPath"/>.</summary>
 /// <exception cref="InvalidOperationException">The service refused or failed; the message is fit to show the user.</exception>
 public delegate Task ImageMaker(ImageRequest request, string outputPath, CancellationToken ct);

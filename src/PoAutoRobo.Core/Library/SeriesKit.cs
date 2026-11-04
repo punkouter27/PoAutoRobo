@@ -58,10 +58,30 @@ public sealed record SeriesKit
     /// </summary>
     public static SeriesKit Starter { get; } = new() { ChannelName = "Teaching the R1", Tagline = "One skill at a time" };
 
-    /// <summary>The kit in <paramref name="folder"/>, made safe to use; the <see cref="Starter"/> kit when there is none or it is unreadable.</summary>
-    public static SeriesKit Load(string folder)
+    /// <summary>
+    /// What the kids' series starts with: a cheerful name to change, a toy review for its shape and a brighter colour.
+    /// </summary>
+    /// <remarks>
+    /// ponytail: its logo, mascot and sting left unset are still the app's own robot ones (see <c>Emblem</c>), until
+    /// the owner picks their own on the Series step. Give <c>Emblem</c> a toy-box design to lift it.
+    /// </remarks>
+    public static SeriesKit KidsStarter { get; } = new()
     {
-        var kit = JsonFile.Load(Path.Combine(folder, FileName), Starter, ProjectStore.JsonOptions);
+        ChannelName = "Playtime Adventures",
+        Tagline = "Toys, games and big smiles",
+        Structure = BeatStructure.ToyReview,
+        Captions = new CaptionStyle() with { AccentColor = "#FF5CA8" },
+    };
+
+    public static SeriesKit StarterFor(Show show) => show == Show.Kids ? KidsStarter : Starter;
+
+    /// <summary>
+    /// The kit of <paramref name="show"/> in <paramref name="folder"/>, made safe to use; that show's starter kit when
+    /// there is none or it is unreadable. A shape that belongs to the other show goes back to the show's first.
+    /// </summary>
+    public static SeriesKit Load(string folder, Show show = Show.Robot)
+    {
+        var kit = JsonFile.Load(Path.Combine(folder, FileName), StarterFor(show), ProjectStore.JsonOptions);
         return kit with
         {
             ChannelName = kit.ChannelName ?? "",
@@ -73,7 +93,7 @@ public sealed record SeriesKit
             Captions = kit.Captions is { } style && AssCaptions.IsHexColour(style.AccentColor) ? style : new CaptionStyle(),
             OutroSeconds = Math.Clamp(kit.OutroSeconds, MinOutroSeconds, MaxOutroSeconds),
             Layout = Enum.IsDefined(kit.Layout) ? kit.Layout : IntroLayout.Side,
-            Structure = Enum.IsDefined(kit.Structure) ? kit.Structure : BeatStructure.Story,
+            Structure = BeatPlan.Structures(show).Contains(kit.Structure) ? kit.Structure : BeatPlan.Structures(show)[0],
         };
 
         static string? Bare(string? name) => name is not null && name.Length > 0 && Path.GetFileName(name) == name ? name : null;

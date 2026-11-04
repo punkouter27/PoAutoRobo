@@ -40,7 +40,7 @@ public partial class MainViewModel
         OnPropertyChanged(nameof(ThumbnailNote));
         var notes = name is null ? null : JsonFile.Load<PublishNotes?>(name + NotesExtension, null);
         var episode = Episode!;
-        UploadTitle = notes?.Titles.FirstOrDefault() ?? new PublishNotes([episode.Title], "", [], []).InSeries(_kit.ChannelName, episode.Number).Titles[0];
+        UploadTitle = notes?.Titles.FirstOrDefault() ?? new PublishNotes([episode.Title], "", [], []).InSeries(EpisodeKit.Kit.ChannelName, episode.Number).Titles[0];
         UploadDescription = string.Join("\n\n", new[] { notes?.Description ?? "", Chapters.TrimEnd(), string.Join(' ', notes?.Hashtags ?? []) }.Where(p => p.Length > 0));
         UploadTags = string.Join(", ", notes?.Tags ?? []);
         VideoLink = "";
@@ -72,7 +72,7 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanMakeThumbnails))]
     private Task MakeThumbnailsAsync() => RunActivityAsync("Making thumbnails", async ct =>
     {
-        var (episode, brand) = (Episode!, SeriesBrand);
+        var (episode, brand) = (Episode!, EpisodeBrand);
         var made = await Task.Run(() => _builder.ThumbnailsAsync(episode, brand, ct), ct);
         ThumbnailChoices.Clear();
         foreach (var picture in made)
@@ -150,7 +150,8 @@ public partial class MainViewModel
             return;
         }
         var details = new UploadDetails(UploadTitle.Trim() is { Length: > 0 } title ? title : Episode!.Title, UploadDescription,
-            [.. UploadTags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)], ChosenPrivacy, PublishAt);
+            [.. UploadTags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)], ChosenPrivacy, PublishAt)
+        { MadeForKids = EpisodeIsKids };
         var thumbnail = File.Exists(ThumbnailPath) ? ThumbnailPath : null;
         if (!await Confirm("Upload to YouTube?", $"Uploads {Path.GetFileName(video)} to your channel as “{details.Title}”, {Seen}{(thumbnail is null ? "" : ", with the chosen thumbnail")}. " +
             "Your browser opens to sign in to Google first; that sign-in is used for this upload only. It costs nothing.", "Upload") || !CanUpload)
@@ -182,7 +183,7 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanUploadShorts))]
     private async Task UploadShortsAsync()
     {
-        var (episode, youTube, folder) = (Episode!, _youTube!, Path.Combine(EpisodeFolder!, "export", "teasers"));
+        var (episode, youTube, folder, kids) = (Episode!, _youTube!, Path.Combine(EpisodeFolder!, "export", "teasers"), EpisodeIsKids);
         var hooks = JsonFile.Load<List<string>?>(Path.Combine(folder, HooksFile), null);
         // The teasers of the last render, by their number; one left from an earlier render with more is not among them.
         var files = Directory.Exists(folder) ? Directory.GetFiles(folder, "*.mp4").Order()
@@ -206,7 +207,8 @@ public partial class MainViewModel
                 var (from, span, which) = (0.02 + 0.98 * i / files.Count, 0.98 / files.Count, $"Sending teaser {i + 1} of {files.Count}");
                 var sent = new Progress<double>(p => ReportActivity($"{which} · {p:P0}", from + span * p));
                 var details = new UploadDetails($"{Hook(files[i])} #Shorts", $"{episode.Title}\n\nThe whole episode is on the channel.\n\n#Shorts",
-                    [.. UploadTags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)], ChosenPrivacy, PublishAt);
+                    [.. UploadTags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)], ChosenPrivacy, PublishAt)
+                { MadeForKids = kids };
                 links.Add($"https://youtube.com/shorts/{await youTube.UploadAsync(token, files[i], details, sent, ct)}");
             }
             VideoLink = string.Join('\n', links);

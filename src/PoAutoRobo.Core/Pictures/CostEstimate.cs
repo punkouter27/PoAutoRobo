@@ -17,6 +17,12 @@ public sealed record CostEstimate(IReadOnlyList<Guid> ClipIds, int Pictures, dec
     /// <summary>The same picture at low quality, for drafts. Approximate, like the price above.</summary>
     private const decimal MiniDraftPrice = 0.006m;
 
+    /// <summary>
+    /// Approximate list price of one picture from FLUX.1 Kontext pro, in US dollars (checked November 2026). It has no
+    /// quality setting, so a draft costs the same.
+    /// </summary>
+    public const decimal FluxPicturePrice = 0.04m;
+
     public bool NothingToDo => ClipIds.Count == 0;
 
     public string Summary
@@ -36,10 +42,12 @@ public sealed record CostEstimate(IReadOnlyList<Guid> ClipIds, int Pictures, dec
         }
     }
 
-    public static CostEstimate For(Episode episode, string imageModel, Quality quality = Quality.Medium)
+    /// <param name="finals">Draft pictures count as wanted too: they are what is drawn again at full quality.</param>
+    /// <param name="subjectSheet">The episode's subject sheet is still to be drawn, one picture more.</param>
+    public static CostEstimate For(Episode episode, string imageModel, Quality quality = Quality.Medium, bool finals = false, bool subjectSheet = false)
     {
-        var clips = episode.Clips.Where(NeedsPicture).ToList();
-        var pictures = clips.Sum(c => Visuals.PictureCount(c.Visual.Kind));
+        var clips = episode.Clips.Where(c => NeedsPicture(c) || (finals && c.Draft && Visuals.PictureCount(c.Visual.Kind) > 0)).ToList();
+        var pictures = clips.Sum(c => Visuals.PictureCount(c.Visual.Kind)) + (subjectSheet && clips.Any(c => Visuals.UsesSubject(c.Visual.Kind)) ? 1 : 0);
         var videos = clips.Count(c => c.Visual.Kind == VisualKind.AiVideo);
         // No pictures means no unknown price, whatever the model is.
         return new CostEstimate([.. clips.Select(c => c.Id)], pictures, (pictures == 0 ? 0 : pictures * PriceOf(imageModel, quality)) + videos * VideoPrice, videos);
@@ -48,6 +56,7 @@ public sealed record CostEstimate(IReadOnlyList<Guid> ClipIds, int Pictures, dec
     /// <summary>Price of one picture from this model, or null when it is not known.</summary>
     public static decimal? PriceOf(string imageModel, Quality quality = Quality.Medium) => (imageModel, quality) switch
     {
+        _ when ImageModels.IsFlux(imageModel) => FluxPicturePrice,
         ("gpt-image-1-mini", Quality.Medium) => MiniPicturePrice,
         ("gpt-image-1-mini", Quality.Low) => MiniDraftPrice,
         _ => null,

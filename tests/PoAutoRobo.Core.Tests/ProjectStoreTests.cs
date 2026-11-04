@@ -239,6 +239,34 @@ public sealed class ProjectStoreTests : IDisposable
         Assert.Equal(["Hook", "Explain", "Demo", "Next time"], BeatPlan.Beats(BeatStructure.HookFirst).Select(b => b.Name));
     }
 
+    [Fact]
+    public void The_kids_series_is_told_in_its_own_shapes_counts_its_own_episodes_and_keeps_a_kit_of_its_own()
+    {
+        Assert.Equal(["Hello", "Unboxing", "Play time", "What he thinks", "Bye"], BeatPlan.Beats(BeatStructure.ToyReview).Select(b => b.Name));
+        Assert.Equal(["Hello", "Best bits", "Bye"], BeatPlan.Beats(BeatStructure.Highlights).Select(b => b.Name));
+        Assert.Equal([Show.Robot, Show.Robot, Show.Robot, Show.Kids, Show.Kids], Enum.GetValues<BeatStructure>().Select(BeatPlan.ShowOf));
+        Assert.Equal("Dino egg\n\nFunny moments: fed it a crayon", new Lesson("Dino egg", "fed it a crayon", BeatStructure.ToyReview, []).Topic);
+
+        // Robot episode 7 and kids' episode 2: each series numbers, and is told about, its own.
+        ProjectStore.Save(NewEpisode(1) with { Number = 7 }, Path.Combine(_folder, "robot"));
+        var kids = NewEpisode(1) with { Number = 2, Structure = BeatStructure.Highlights };
+        ProjectStore.Save(kids, Path.Combine(_folder, "kids"));
+        Assert.Equal((8, 3), (ProjectStore.NextNumber(_folder), ProjectStore.NextNumber(_folder, Show.Kids)));
+        Assert.Equal([$"#2 · {kids.Title}: {kids.Clips[0].Title}"], ProjectStore.SeriesBefore(_folder, 3, Show.Kids));
+        Assert.Equal(Show.Kids, ProjectStore.Summaries(_folder).Single(s => s.Number == 2).Show);
+        Assert.StartsWith("Kids · ", ProjectStore.Summaries(_folder).Single(s => s.Number == 2).Details);
+        var copy = ProjectStore.Load(ProjectStore.Duplicate(Path.Combine(_folder, "kids"), _folder));
+        Assert.Equal((3, BeatStructure.Highlights), (copy.Number, copy.Structure)); // a copy is the next of its own series
+
+        // The kids' kit starts as its own, and a robot shape written into it goes back to the kids' first.
+        var kit = Path.Combine(_folder, "series-kids");
+        Assert.Equal(SeriesKit.KidsStarter, SeriesKit.Load(kit, Show.Kids));
+        Directory.CreateDirectory(kit);
+        File.WriteAllText(Path.Combine(kit, SeriesKit.FileName), """{ "ChannelName": "Play", "Structure": "HookFirst" }""");
+        Assert.Equal(BeatStructure.ToyReview, SeriesKit.Load(kit, Show.Kids).Structure);
+        Assert.Equal(BeatStructure.HookFirst, SeriesKit.Load(kit).Structure); // read as the robot's, the same shape is fine
+    }
+
     // ---- The scratch folder ----
 
     [Fact]

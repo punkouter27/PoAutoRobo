@@ -34,6 +34,15 @@
 
         <ScrollViewer Background="{ThemeResource LayerFillColorDefaultBrush}" VerticalScrollBarVisibility="Auto">
             <StackPanel Padding="{StaticResource PagePadding}" Spacing="{StaticResource Gap}">
+                <!-- Each series has a kit of its own; this says which one is being set up -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Series" />
+                    <controls:Segmented x:Name="ShowSelector" SelectedIndex="{x:Bind ViewModel.SeriesShowIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Series"
+                                        ToolTipService.ToolTip="Which series to set up. The robot series and the kids' series each have their own name, look, intro, outro, music and shape; changing one never touches the other. The Lesson step writes the next episode for the series chosen here. Free.">
+                        <controls:SegmentedItem Content="Robot" />
+                        <controls:SegmentedItem Content="Kids" />
+                    </controls:Segmented>
+                </StackPanel>
                 <TextBox x:Name="ChannelBox" Header="Channel name" PlaceholderText="Teaching the R1" Text="{x:Bind ViewModel.SeriesChannel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="60"
                          ToolTipService.ToolTip="Your channel's name, shown large in every intro and outro. Type it once; it is saved as you go. Without one, episodes are exported with no intro or outro." />
                 <TextBox x:Name="TaglineBox" Header="Tagline" PlaceholderText="One skill at a time" Text="{x:Bind ViewModel.SeriesTagline, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="80"
@@ -223,12 +232,9 @@
                 <TextBlock Text="New episodes" Style="{StaticResource SectionHeading}" />
                 <StackPanel Spacing="4">
                     <TextBlock Text="Told as" />
-                    <controls:Segmented x:Name="StructureSelector" SelectedIndex="{x:Bind ViewModel.SeriesStructureIndex, Mode=TwoWay}" HorizontalAlignment="Stretch" AutomationProperties.Name="Structure"
-                                        ToolTipService.ToolTip="The shape every episode of the series follows, so each lesson is told the same way. Story: goal, try, fail, fix, result, recap. Tutorial: concept, setup, demo, recap. Hook first: the best moment, then how it works.">
-                        <controls:SegmentedItem Content="Story" />
-                        <controls:SegmentedItem Content="Tutorial" />
-                        <controls:SegmentedItem Content="Hook first" />
-                    </controls:Segmented>
+                    <!-- The series' own shapes: they change with the series, so the items come from the view model, then the choice -->
+                    <controls:Segmented x:Name="StructureSelector" ItemsSource="{x:Bind ViewModel.StructureLabels, Mode=OneWay}" SelectedIndex="{x:Bind ViewModel.SeriesStructureIndex, Mode=TwoWay}"
+                                        HorizontalAlignment="Stretch" AutomationProperties.Name="Structure" ToolTipService.ToolTip="{x:Bind ViewModel.StructureTip, Mode=OneWay}" />
                     <TextBlock x:Name="BeatsText" Text="{x:Bind ViewModel.StructureBeats, Mode=OneWay}" Style="{StaticResource QuietText}" TextWrapping="Wrap"
                                ToolTipService.ToolTip="The beats in order. Your footage goes in the ones marked with a camera." />
                 </StackPanel>

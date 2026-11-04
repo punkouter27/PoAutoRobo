@@ -29,6 +29,12 @@ public interface IScriptWriter
     const int MaxTopicLength = 8000;
 
     /// <summary>
+    /// The series of the open episode, for the jobs handed one of its clips or lines alone. A lesson and an episode
+    /// say their own series by their shape, and a film is handed its own, and the jobs given one use that instead.
+    /// </summary>
+    Show Show { get; set; }
+
+    /// <summary>
     /// Writes the lesson as an episode told in its beats, with each of the owner's footage files in one clip (the
     /// files are not copied here). Every clip is at depth B only; the other depths are written when first asked for.
     /// </summary>
@@ -50,15 +56,22 @@ public interface IScriptWriter
     /// <summary>Thinks of another picture for a clip whose picture the picture model declined to draw.</summary>
     Task<SaferPicture> RethinkPictureAsync(Clip clip, CancellationToken ct);
 
-    /// <summary>Reads the whole script as an editor would and notes the clips worth changing; none when it reads well.</summary>
-    Task<IReadOnlyList<ClipNote>> ReviewAsync(Episode episode, CancellationToken ct);
+    /// <summary>
+    /// Reads the whole script as an editor would and notes the clips worth changing; none when it reads well. With the
+    /// passages it was written from, a claim none of them backs is noted too.
+    /// </summary>
+    Task<IReadOnlyList<ClipNote>> ReviewAsync(Episode episode, IReadOnlyList<GroundingSnippet> references, CancellationToken ct);
+
+    /// <summary>The words drawn into a picture, as they appear; null when there are none, or nothing here can see pictures.</summary>
+    Task<string?> CheckLetteringAsync(string picturePath, CancellationToken ct);
 
     /// <summary>Rewrites one clip's words to answer the editor's note on them, keeping what the note does not mention.</summary>
     Task<string> ReviseAsync(Clip clip, string note, CancellationToken ct);
 
     /// <summary>What happens in one of the owner's films, seen from a few of its frames; null when nothing here can see pictures.</summary>
     /// <param name="note">The owner's own line on it, when they wrote one.</param>
-    Task<FootageSeen?> WatchAsync(IReadOnlyList<Frame> frames, string note, CancellationToken ct);
+    /// <param name="show">The series the film is for, which says what to look for in it.</param>
+    Task<FootageSeen?> WatchAsync(IReadOnlyList<Frame> frames, string note, Show show, CancellationToken ct);
 
     /// <summary>Looks at a scene's frame once it has built, for labels cut off, overlapping or under the captions.</summary>
     Task<SceneVerdict> CheckSceneAsync(string framePath, CancellationToken ct);

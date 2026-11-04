@@ -6,9 +6,9 @@ namespace PoAutoRobo.Core.Library;
 /// <summary>One saved episode as the library lists it.</summary>
 /// <param name="Thumbnail">The first generated picture still on disk, or null.</param>
 /// <param name="Number">Where the episode comes in the series; 0 when it has no number.</param>
-public sealed record EpisodeSummary(string Folder, string Title, string? Thumbnail, int Clips, TimeSpan Runtime, DateTime Saved, int Number = 0)
+public sealed record EpisodeSummary(string Folder, string Title, string? Thumbnail, int Clips, TimeSpan Runtime, DateTime Saved, int Number = 0, Show Show = Show.Robot)
 {
-    public string Details => Clips == 0 ? "Damaged · open to restore" : $"{(Clips == 1 ? "1 clip" : $"{Clips} clips")} · {Runtime:m\\:ss}";
+    public string Details => Clips == 0 ? "Damaged · open to restore" : $"{(Show == Show.Kids ? "Kids" : "Robot")} · {(Clips == 1 ? "1 clip" : $"{Clips} clips")} · {Runtime:m\\:ss}";
 
     /// <summary>The full title and when it was last saved, for a tooltip; the list itself has room for neither.</summary>
     public string Tip => $"{Title}\nSaved {Saved:d MMM yyyy, HH:mm}";
@@ -116,7 +116,7 @@ public static class ProjectStore
             {
                 var episode = Load(folder);
                 var runtime = Durations.Total(episode, measured is null ? null : clip => measured(clip, folder));
-                return new EpisodeSummary(folder, episode.Title, episode.Cover(), episode.Clips.Count, runtime, saved, episode.Number);
+                return new EpisodeSummary(folder, episode.Title, episode.Cover(), episode.Clips.Count, runtime, saved, episode.Number, BeatPlan.ShowOf(episode.Structure));
             }
             catch (InvalidDataException)
             {
@@ -128,10 +128,10 @@ public static class ProjectStore
     private const int EarlierShown = 10;
 
     /// <summary>
-    /// The series before episode <paramref name="number"/>, a line to each in order: its number, title and clip
-    /// titles. A new script is told these so it can call back to them and not explain them again.
+    /// The series before episode <paramref name="number"/> of <paramref name="show"/>, a line to each in order: its
+    /// number, title and clip titles. A new script is told these so it can call back to them and not explain them again.
     /// </summary>
-    public static IReadOnlyList<string> SeriesBefore(string root, int number) =>
+    public static IReadOnlyList<string> SeriesBefore(string root, int number, Show show = Show.Robot) =>
         [.. ListEpisodes(root)
             .Select(folder =>
             {
@@ -145,15 +145,19 @@ public static class ProjectStore
                 }
             })
             .OfType<Episode>()
-            .Where(e => e.Number > 0 && e.Number < number)
+            .Where(e => e.Number > 0 && e.Number < number && BeatPlan.ShowOf(e.Structure) == show)
             .OrderByDescending(e => e.Number).Take(EarlierShown).OrderBy(e => e.Number)
             .Select(e => $"#{e.Number} · {e.Title}: {string.Join("; ", e.Clips.Select(c => c.Title))}")];
 
-    /// <summary>The number the next episode of the series gets: one more than the highest saved, so a gap is never filled.</summary>
-    public static int NextNumber(string root) => NextNumber(Summaries(root));
+    /// <summary>
+    /// The number the next episode of <paramref name="show"/> gets: one more than the highest saved, so a gap is never
+    /// filled. Each series counts its own.
+    /// </summary>
+    public static int NextNumber(string root, Show show = Show.Robot) => NextNumber(Summaries(root), show);
 
-    /// <summary>The number the next episode gets, from the library already listed.</summary>
-    public static int NextNumber(IEnumerable<EpisodeSummary> library) => library.Select(s => s.Number).DefaultIfEmpty(0).Max() + 1;
+    /// <summary>The number the next episode of <paramref name="show"/> gets, from the library already listed.</summary>
+    public static int NextNumber(IEnumerable<EpisodeSummary> library, Show show = Show.Robot) =>
+        library.Where(s => s.Show == show).Select(s => s.Number).DefaultIfEmpty(0).Max() + 1;
 
     private const string SnippetsFile = "grounding.json";
 
@@ -174,7 +178,7 @@ public static class ProjectStore
     {
         var episode = Load(folder);
         var title = episode.Title + " copy";
-        var number = episode.Number > 0 ? NextNumber(root) : 0;
+        var number = episode.Number > 0 ? NextNumber(root, BeatPlan.ShowOf(episode.Structure)) : 0;
         var copy = NewFolder(root, title, number);
         foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
         {

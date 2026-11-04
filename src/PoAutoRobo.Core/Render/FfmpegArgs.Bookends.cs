@@ -101,7 +101,7 @@ public static partial class FfmpegArgs
         Card(look, length, preset, output,
         [
             Words(channelFile, "h/12", "(w-text_w)/2", "h*0.08", 0.3),
-            "drawtext=text='Subscribe for the next lesson':expansion=none:" + TextStyle("h/22", "(w-text_w)/2", "h*0.20", 0.6),
+            $"drawtext=text='{look.CallToAction}':expansion=none:" + TextStyle("h/22", "(w-text_w)/2", "h*0.20", 0.6),
             .. nextFile is null ? [] : new[] { Words(nextFile, "h/20", "(w-text_w)/2", "h*0.86", 0.9) },
             "drawbox=x=iw*0.50:y=ih*0.36:w=iw*0.21:h=iw*0.21*9/16:color=white@0.35:t=4",
             "drawbox=x=iw*0.74:y=ih*0.36:w=iw*0.21:h=iw*0.21*9/16:color=white@0.35:t=4",

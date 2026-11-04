@@ -33,7 +33,7 @@ public sealed partial class EpisodeBuilder
         var name = intro ? "intro" : "outro";
         var work = Files.NewScratchFolder(name);
         CopyTitleFont(work);
-        var sample = new Episode("Your next lesson", "", [], 0) { Number = number };
+        var sample = new Episode(SampleTitle(brand), "", [], 0) { Number = number };
         var cache = new MediaCache(ClipCacheFolder);
         var sound = await BookendSoundAsync(intro, brand, SeriesKit.PathOf(brand.Folder, brand.Kit.Music), work, cache, ct);
         var picture = await BookendPictureAsync(intro, brand, sample, Draft, intro ? IntroLength : brand.Kit.Outro, work, cache, ct);
@@ -123,27 +123,40 @@ public sealed partial class EpisodeBuilder
         foreach (var (key, text) in lines.Where(l => l.Text.Trim().Length > 0))
             await System.IO.File.WriteAllTextAsync(Path.Combine(work, $"{name}_{key}.txt"), text.Trim(), ct);
 
-        // A series without its own logo or mascot gets the app's own, in its colour.
+        // A series without its own logo or mascot gets the app's own, in its colour: a robot for the robot series, a teddy for the kids'.
         var accent = kit.Captions.AccentColor;
+        var kids = BeatPlan.ShowOf(kit.Structure) == Show.Kids;
         var look = new BookendLook(accent,
-            SeriesKit.PathOf(brand.Folder, kit.Logo) ?? await MadeUpPictureAsync(logo: true, accent, work, ct),
-            SeriesKit.PathOf(brand.Folder, kit.Mascot) ?? await MadeUpPictureAsync(logo: false, accent, work, ct),
-            kit.Layout, kit.Grain);
+            SeriesKit.PathOf(brand.Folder, kit.Logo) ?? await MadeUpPictureAsync(logo: true, accent, kids, work, ct),
+            SeriesKit.PathOf(brand.Folder, kit.Mascot) ?? await MadeUpPictureAsync(logo: false, accent, kids, work, ct),
+            kit.Layout, kit.Grain, kids ? BookendLook.KidsSubscribe : BookendLook.Subscribe);
         IReadOnlyList<string> Args(string to) => intro
             ? FfmpegArgs.IntroVideo(look, File("channel")!, File("tagline"), File("title")!, length, preset, to)
             : FfmpegArgs.OutroVideo(look, File("channel")!, File("next"), length, preset, to);
         return (look, [.. lines.Select(l => l.Text)], Args, File);
     }
 
+    /// <summary>What the Series step's intro and outro show for the next episode's title.</summary>
+    private static string SampleTitle(Brand brand) => BeatPlan.ShowOf(brand.Kit.Structure) == Show.Kids ? "Your next video" : "Your next lesson";
+
     /// <summary>The app's own logo or mascot in the series colour (see <see cref="Emblem"/>), made once for each colour and kept in the clip cache.</summary>
-    private async Task<string> MadeUpPictureAsync(bool logo, string accent, string work, CancellationToken ct)
+    /// <param name="kids">A teddy bear for the kids' series in place of the robot.</param>
+    private async Task<string> MadeUpPictureAsync(bool logo, string accent, bool kids, string work, CancellationToken ct)
     {
         var (width, height) = logo ? (Emblem.LogoSize, Emblem.LogoSize) : (Emblem.MascotWidth, Emblem.MascotHeight);
-        return await new MediaCache(ClipCacheFolder).GetOrCreateAsync([MadeUpPictures, logo ? "logo" : "mascot", accent], ".png", async scratch =>
+        string[] key = kids ? [MadeUpPictures, logo ? "logo" : "mascot", accent, "teddy"] : [MadeUpPictures, logo ? "logo" : "mascot", accent];
+        return await new MediaCache(ClipCacheFolder).GetOrCreateAsync(key, ".png", async scratch =>
         {
             var colour = Convert.FromHexString(accent.TrimStart('#'));
+            var rgb = (colour[0], colour[1], colour[2]);
             var pixels = Path.Combine(work, logo ? "made-up-logo.rgba" : "made-up-mascot.rgba");
-            await File.WriteAllBytesAsync(pixels, logo ? Emblem.Logo((colour[0], colour[1], colour[2])) : Emblem.Mascot((colour[0], colour[1], colour[2])), ct);
+            await File.WriteAllBytesAsync(pixels, (logo, kids) switch
+            {
+                (true, true) => Emblem.TeddyLogo(rgb),
+                (false, true) => Emblem.TeddyMascot(rgb),
+                (true, false) => Emblem.Logo(rgb),
+                _ => Emblem.Mascot(rgb),
+            }, ct);
             await ffmpeg.RunAsync(FfmpegArgs.Picture(pixels, width, height, scratch), work, null, null, ct);
         });
     }
@@ -161,7 +174,7 @@ public sealed partial class EpisodeBuilder
         var name = intro ? "intro" : "outro";
         var work = Files.NewScratchFolder($"{name}-still");
         CopyTitleFont(work);
-        var sample = new Episode("Your next lesson", "", [], 0) { Number = number };
+        var sample = new Episode(SampleTitle(brand), "", [], 0) { Number = number };
         var length = intro ? IntroLength : brand.Kit.Outro;
         var (_, _, args, _) = await BookendCardAsync(intro, brand, sample, StillSize, length, work, ct);
         var output = Path.Combine(work, $"{name}.png");

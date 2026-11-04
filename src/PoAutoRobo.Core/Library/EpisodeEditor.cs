@@ -151,7 +151,8 @@ public static class EpisodeEditor
     // Attaches finished pictures to the clip they were drawn for, as that clip is now. Drawing takes a while, so the
     // clip may have moved on: footage or a different picture type wins and the pictures are dropped; changed words
     // keep the pictures but mark them out of date.
-    public static Episode ApplyPicture(Episode episode, Clip requested, IReadOnlyList<string> paths)
+    /// <param name="draft">The pictures are quick drafts, to be drawn again at full quality.</param>
+    public static Episode ApplyPicture(Episode episode, Clip requested, IReadOnlyList<string> paths, bool draft = false)
     {
         var current = episode.Clips.FirstOrDefault(c => c.Id == requested.Id);
         if (current is null || current.Visual.Kind != requested.Visual.Kind || current.Visual.UserVideoPath is not null)
@@ -161,7 +162,7 @@ public static class EpisodeEditor
         var earlier = requested.Visual.Take != current.Visual.Take && current.Visual.MediaPaths is { Count: > 0 } shown && !shown.SequenceEqual(paths)
             ? [.. current.Visual.EarlierTakes ?? [], shown]
             : current.Visual.EarlierTakes;
-        return Update(episode, requested.Id, c => c with { Visual = c.Visual with { MediaPaths = paths, Stale = !stillDescribesIt, Take = requested.Visual.Take, EarlierTakes = earlier } });
+        return Update(episode, requested.Id, c => c with { Visual = c.Visual with { MediaPaths = paths, Stale = !stillDescribesIt, Take = requested.Visual.Take, EarlierTakes = earlier }, Draft = draft });
     }
 
     /// <summary>The clip with its active depth's picture described as <paramref name="prompt"/>.</summary>
@@ -175,7 +176,7 @@ public static class EpisodeEditor
     /// could not be made as described. Only when the clip is still as it was when its picture was asked for: any
     /// change made to it meanwhile wins, and what was drawn is dropped.
     /// </summary>
-    public static Episode ApplySubstitute(Episode episode, Clip requested, Clip drawn, IReadOnlyList<string> paths)
+    public static Episode ApplySubstitute(Episode episode, Clip requested, Clip drawn, IReadOnlyList<string> paths, bool draft = false)
     {
         var current = episode.Clips.FirstOrDefault(c => c.Id == requested.Id);
         if (current is null || current.Active != requested.Active || current.Visual.Kind != requested.Visual.Kind || current.Visual.UserVideoPath is not null)
@@ -184,6 +185,7 @@ public static class EpisodeEditor
         return Update(episode, requested.Id, c => WithVisualPrompt(c, drawn.Active.VisualPrompt) with
         {
             Visual = drawn.Visual with { MediaPaths = paths.Count > 0 ? paths : null, EarlierTakes = c.Visual.EarlierTakes },
+            Draft = draft && paths.Count > 0,
         });
     }
 

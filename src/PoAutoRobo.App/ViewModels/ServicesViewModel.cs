@@ -17,8 +17,8 @@ public sealed partial class ServicesViewModel : ObservableObject
     public ServicesViewModel()
     {
         var saved = ServiceChoices.Load(AppPaths.Services);
-        (Video, VideoModel, StockPhotos, Local, LocalModel, Meaning, EmbeddingModel) =
-            (saved.Video, saved.VideoModel, saved.StockPhotos, saved.Local, saved.LocalModel, saved.Meaning, saved.EmbeddingModel);
+        (Video, VideoModel, StockPhotos, Local, LocalModel, Meaning, EmbeddingModel, ImageModel) =
+            (saved.Video, saved.VideoModel, saved.StockPhotos, saved.Local, saved.LocalModel, saved.Meaning, saved.EmbeddingModel, saved.ImageModel);
         _ready = true;
     }
 
@@ -43,6 +43,26 @@ public sealed partial class ServicesViewModel : ObservableObject
     [ObservableProperty]
     public partial string EmbeddingModel { get; set; } = "";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ImageModelIndex))]
+    public partial string ImageModel { get; set; } = "";
+
+    /// <summary>The picture models on offer, as the list in Settings shows them.</summary>
+    public static Choice<string>[] ImageModelChoices { get; } =
+    [
+        new("GPT-image (gpt-image-1-mini)", ImageModels.Standard), new("FLUX.1 Kontext pro", ImageModels.Flux),
+    ];
+
+    /// <summary>The picture model as an index into <see cref="ImageModelChoices"/>; a name typed elsewhere shows as none.</summary>
+    public int ImageModelIndex
+    {
+        get => Array.FindIndex(ImageModelChoices, c => c.Value == ImageModel.Trim());
+        set
+        {
+            if (value >= 0 && value < ImageModelChoices.Length) ImageModel = ImageModelChoices[value].Value;
+        }
+    }
+
     private static readonly ServiceChoices Standard = new();
 
     /// <summary>Advanced controls are on, so every model's name can be changed. Set by the Settings page as its switch moves.</summary>
@@ -58,9 +78,11 @@ public sealed partial class ServicesViewModel : ObservableObject
 
     public bool ShowEmbeddingModel => Meaning && (Advanced || EmbeddingModel.Trim() != Standard.EmbeddingModel);
 
-    private static readonly string[] Shown = [nameof(ShowVideoModel), nameof(ShowLocalModel), nameof(ShowEmbeddingModel)];
+    public bool ShowImageModel => Advanced || ImageModel.Trim() != Standard.ImageModel;
 
-    private ServiceChoices Choices => new(Video, VideoModel.Trim(), StockPhotos, Local, LocalModel.Trim(), Meaning, EmbeddingModel.Trim());
+    private static readonly string[] Shown = [nameof(ShowVideoModel), nameof(ShowLocalModel), nameof(ShowEmbeddingModel), nameof(ShowImageModel)];
+
+    private ServiceChoices Choices => new(Video, VideoModel.Trim(), StockPhotos, Local, LocalModel.Trim(), Meaning, EmbeddingModel.Trim(), ImageModel.Trim());
 
     /// <summary>The switches differ from what the app started with, so it must start again to use them.</summary>
     public bool NeedsRestart => Choices != StartedWith;

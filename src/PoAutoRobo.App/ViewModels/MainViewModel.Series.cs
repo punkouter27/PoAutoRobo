@@ -22,8 +22,62 @@ public partial class MainViewModel
 
     private SeriesKit _kit = SeriesKit.Load(AppPaths.Series);
 
-    /// <summary>The kit and where its files are, for the intro, the outro and new episodes.</summary>
-    public Brand SeriesBrand => new(_kit, AppPaths.Series);
+    /// <summary>
+    /// The series being worked on: the one the next episode is written for and the Series step sets up. Opening an
+    /// episode turns to its series. Each has its own kit, shapes and numbering.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowIndex), nameof(SeriesShowIndex), nameof(LessonShowIndex), nameof(IsKids), nameof(TaughtHeader), nameof(TaughtPlaceholder), nameof(TaughtTip),
+        nameof(WentWrongHeader), nameof(WentWrongPlaceholder), nameof(WentWrongTip), nameof(FootageTip), nameof(StructureTip), nameof(Guide))]
+    public partial Show CurrentShow { get; set; }
+
+    partial void OnCurrentShowChanged(Show value)
+    {
+        _kit = SeriesKit.Load(KitFolder, value);
+        LogoCandidates.Clear();
+        IntroPreviewPath = null;
+        OutroPreviewPath = null;
+        // Each series counts its own episodes, so the number filled in is the next of this one.
+        var next = ProjectStore.NextNumber(Library, value);
+        if (double.IsNaN(EpisodeNumber) || (int)EpisodeNumber == _suggestedNumber) EpisodeNumber = next;
+        _suggestedNumber = next;
+        // The shapes first: changing the list clears its choice, which the kit's shape, said next, then sets again.
+        OnPropertyChanged(nameof(StructureLabels));
+        foreach (var name in SeriesFields)
+            OnPropertyChanged(name);
+        RedrawStill();
+    }
+
+    /// <summary>The series as the switches on the Lesson and Series steps show it: 0 the robot's, 1 the kids'.</summary>
+    public int ShowIndex
+    {
+        get => (int)CurrentShow;
+        set
+        {
+            if (value is 0 or 1) CurrentShow = (Show)value;
+        }
+    }
+
+    public bool IsKids => CurrentShow == Show.Kids;
+
+    private string KitFolder => AppPaths.SeriesFor(CurrentShow);
+
+    /// <summary>The kit and where its files are, for the Series step's intro and outro and for new episodes.</summary>
+    public Brand SeriesBrand => new(_kit, KitFolder);
+
+    /// <summary>
+    /// The kit of the open episode's series, for its render and upload. It is not always the one the Series step shows:
+    /// the next episode may be for the other series while this one is still open.
+    /// </summary>
+    private (SeriesKit Kit, string Folder) EpisodeKit =>
+        Episode is { } episode && BeatPlan.ShowOf(episode.Structure) is var show && show != CurrentShow
+            ? (SeriesKit.Load(AppPaths.SeriesFor(show), show), AppPaths.SeriesFor(show))
+            : (_kit, KitFolder);
+
+    public Brand EpisodeBrand => new(EpisodeKit.Kit, EpisodeKit.Folder);
+
+    /// <summary>The open episode is one of the kids' series, so YouTube is told it is made for children.</summary>
+    public bool EpisodeIsKids => Episode is { } episode && BeatPlan.ShowOf(episode.Structure) == Show.Kids;
 
     // The intro page's fields. Each change is saved at once: there is nothing to lose by leaving.
 
@@ -59,13 +113,14 @@ public partial class MainViewModel
         set => Store(_kit with { Grain = value });
     }
 
-    /// <summary>How every episode is told, as an index into <see cref="StructureChoices"/>.</summary>
+    /// <summary>How every episode of the series is told, as an index into <see cref="StructureLabels"/>.</summary>
     public int SeriesStructureIndex
     {
-        get => Math.Max(0, Array.FindIndex(StructureChoices, c => c.Value == _kit.Structure));
+        get => IntroShown ? Math.Max(0, BeatPlan.Structures(CurrentShow).ToList().IndexOf(_kit.Structure)) : -1;
         set
         {
-            if (value >= 0 && value < StructureChoices.Length) Store(_kit with { Structure = StructureChoices[value].Value });
+            var shapes = BeatPlan.Structures(CurrentShow);
+            if (value >= 0 && value < shapes.Count) Store(_kit with { Structure = shapes[value] });
         }
     }
 
@@ -73,7 +128,7 @@ public partial class MainViewModel
     /// The open episode looks other than the series now does: made before the picture style, captions or outro music
     /// changed. The Series step then offers to bring it into line.
     /// </summary>
-    public bool EpisodeOffSeriesLook => Episode is { } episode && (EpisodeEditor.UseSeriesLook(episode, _kit, null) != episode
+    public bool EpisodeOffSeriesLook => Episode is { } episode && BeatPlan.ShowOf(episode.Structure) == CurrentShow && (EpisodeEditor.UseSeriesLook(episode, _kit, null) != episode
         || (_kit.Music is { } music && !string.Equals(Path.GetFileName(episode.MusicPath), "music-" + music, StringComparison.OrdinalIgnoreCase)));
 
     public int SeriesLookIndex
@@ -187,7 +242,7 @@ public partial class MainViewModel
         _kit = kit;
         try
         {
-            kit.Save(AppPaths.Series);
+            kit.Save(KitFolder);
         }
         catch (IOException e)
         {
@@ -211,7 +266,9 @@ public partial class MainViewModel
     /// </summary>
     public void SetSeriesFile(string role, string path) => _ = Guard(async () =>
     {
-        var name = await Task.Run(() => SeriesKit.Import(AppPaths.Series, path, role));
+        var folder = KitFolder; // the series switched while the file is copied keeps its own kit
+        var name = await Task.Run(() => SeriesKit.Import(folder, path, role));
+        if (folder != KitFolder) return;
         Store(role switch
         {
             "logo" => _kit with { Logo = name },
@@ -261,7 +318,7 @@ public partial class MainViewModel
             ErrorMessage = refusal;
             return;
         }
-        var from = HasHostDesign ? "your host, simplified to an emblem" : "a friendly robot head";
+        var from = IsKids ? "a friendly robot head" : HasHostDesign ? "your host, simplified to an emblem" : "a friendly robot head";
         if (!await ConfirmSpend("Make 3 logos?", $"Draws three logo designs for {_kit.ChannelName} from {from}, in the series colour, on nothing so they sit on any background. You pick one, or none. Asking again with nothing changed shows the same three, free.", "Make them", dollars))
             return;
         await Guard(async () =>
@@ -329,7 +386,7 @@ public partial class MainViewModel
     private Task UseSeriesLookAsync() => Guard(async () =>
     {
         if (Episode is null || EpisodeFolder is not { } folder) return;
-        var music = SeriesKit.PathOf(AppPaths.Series, _kit.Music) is { } track ? await ImportAsync(track, folder, "music-" + Path.GetFileName(track), CancellationToken.None) : null;
+        var music = SeriesKit.PathOf(KitFolder, _kit.Music) is { } track ? await ImportAsync(track, folder, "music-" + Path.GetFileName(track), CancellationToken.None) : null;
         Edit(e => EpisodeEditor.UseSeriesLook(e, _kit, music));
         StatusMessage = "The episode now has the series look.";
     });

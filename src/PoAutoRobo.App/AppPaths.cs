@@ -21,8 +21,13 @@ public static class AppPaths
 
     public static string HostSheet { get; } = Path.Combine(Host, "sheet.png");
 
-    /// <summary>The series brand kit: its settings and its own copies of the logo, sounds and mascot.</summary>
+    /// <summary>The robot series' brand kit: its settings and its own copies of the logo, sounds and mascot.</summary>
     public static string Series { get; } = Path.Combine(Local, "series");
+
+    /// <summary>The kids' series' brand kit, kept apart so neither series' look reaches the other.</summary>
+    public static string KidsSeries { get; } = Path.Combine(Local, "series-kids");
+
+    public static string SeriesFor(Show show) => show == Show.Kids ? KidsSeries : Series;
 
     public static string Grounding { get; } = Path.Combine(Local, "grounding");
 

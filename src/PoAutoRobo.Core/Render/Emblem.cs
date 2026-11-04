@@ -61,6 +61,64 @@ public static class Emblem
         return pixels;
     }
 
+    private static readonly (byte R, byte G, byte B) Fur = (196, 140, 92), Muzzle = (240, 214, 178);
+
+    /// <summary>The kids' series logo: a teddy bear's head with round ears, a pale muzzle and a bow in the series colour.</summary>
+    /// <returns>Plain RGBA pixels, row by row, <see cref="LogoSize"/> square, see-through around the head.</returns>
+    public static byte[] TeddyLogo((byte R, byte G, byte B) accent)
+    {
+        var pixels = new byte[LogoSize * LogoSize * 4];
+        void Part(Shape shape, (byte, byte, byte) colour, bool outlined = true) => Paint(pixels, LogoSize, LogoSize, shape, colour, outlined ? 12 : 0);
+        TeddyHead(Part, 256, 270, 1.0f, accent);
+        return pixels;
+    }
+
+    /// <summary>The kids' series mascot: a teddy bear sitting up, arms out for a hug, a heart in the series colour on its tummy.</summary>
+    /// <returns>Plain RGBA pixels, row by row, <see cref="MascotWidth"/> by <see cref="MascotHeight"/>, see-through around the bear.</returns>
+    public static byte[] TeddyMascot((byte R, byte G, byte B) accent)
+    {
+        var pixels = new byte[MascotWidth * MascotHeight * 4];
+        void Part(Shape shape, (byte, byte, byte) colour, bool outlined = true) => Paint(pixels, MascotWidth, MascotHeight, shape, colour, outlined ? 7 : 0);
+        // Back to front: feet, arms, body, then the head over them.
+        Part(Circle(176, 668, 62), Fur);
+        Part(Circle(336, 668, 62), Fur);
+        Part(Circle(176, 680, 34), Muzzle, outlined: false);
+        Part(Circle(336, 680, 34), Muzzle, outlined: false);
+        Part(Capsule(150, 420, 84, 520, 40), Fur);
+        Part(Capsule(362, 420, 428, 520, 40), Fur);
+        Part(Circle(256, 520, 140), Fur);
+        Part(Circle(256, 540, 86), Muzzle, outlined: false);
+        Part(Circle(238, 528, 20), accent, outlined: false);
+        Part(Circle(274, 528, 20), accent, outlined: false);
+        Part(Capsule(256, 560, 256, 562, 22), accent, outlined: false);
+        TeddyHead(Part, 256, 236, 0.78f, accent);
+        return pixels;
+    }
+
+    /// <summary>A teddy's head centred at (<paramref name="cx"/>, <paramref name="cy"/>), <paramref name="k"/> times the logo's size.</summary>
+    private static void TeddyHead(Action<Shape, (byte, byte, byte), bool> part, float cx, float cy, float k, (byte R, byte G, byte B) accent)
+    {
+        float X(float dx) => cx + dx * k;
+        float Y(float dy) => cy + dy * k;
+        part(Circle(X(-140), Y(-130), 70 * k), Fur, true);
+        part(Circle(X(140), Y(-130), 70 * k), Fur, true);
+        part(Circle(X(-140), Y(-130), 36 * k), Muzzle, false);
+        part(Circle(X(140), Y(-130), 36 * k), Muzzle, false);
+        part(Circle(cx, cy, 175 * k), Fur, true);
+        part(Box(cx, Y(60), 90 * k, 66 * k, 64 * k), Muzzle, false);
+        part(Circle(X(-66), Y(-30), 22 * k), Ink, false);
+        part(Circle(X(66), Y(-30), 22 * k), Ink, false);
+        part(Circle(X(-60), Y(-38), 7 * k), Shell, false);
+        part(Circle(X(72), Y(-38), 7 * k), Shell, false);
+        part(Box(cx, Y(34), 30 * k, 20 * k, 18 * k), Ink, false);
+        part(Capsule(X(-34), Y(86), cx, Y(98), 7 * k), Ink, false);
+        part(Capsule(cx, Y(98), X(34), Y(86), 7 * k), Ink, false);
+        // A bow under the chin, in the series colour.
+        part(Circle(X(-46), Y(178), 30 * k), accent, true);
+        part(Circle(X(46), Y(178), 30 * k), accent, true);
+        part(Circle(cx, Y(178), 18 * k), accent, true);
+    }
+
     private static Shape Circle(float cx, float cy, float r) => (x, y) => MathF.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) - r;
 
     /// <summary>A box <paramref name="hx"/> by <paramref name="hy"/> either side of its centre, its corners rounded by <paramref name="r"/>.</summary>

@@ -46,6 +46,9 @@
                  ToolTipService.ToolTip="Search tags, separated by commas. YouTube keeps 500 characters of them; the rest are left off." />
         <ComboBox Header="Who can watch" ItemsSource="{x:Bind ViewModel.PrivacyChoices}" SelectedIndex="{x:Bind ViewModel.PrivacyIndex, Mode=TwoWay}" MinWidth="160"
                   ToolTipService.ToolTip="Private: only you. Unlisted: anyone with the link. Public: everyone. Private is safest; change it on YouTube once you have watched it there." />
+        <!-- Only for a kids' video, which YouTube must be told is for children -->
+        <TextBlock Text="Kids' video: uploaded as made for kids, as YouTube asks. Comments and personalised ads are off on it." Style="{StaticResource QuietText}" TextWrapping="Wrap"
+                   Visibility="{x:Bind ViewModel.EpisodeIsKids, Mode=OneWay}" />
         <!-- One above the other: the column is too narrow for the two side by side in a small window -->
         <StackPanel Spacing="{StaticResource GapSmall}" Visibility="{x:Bind ViewModel.Advanced, Mode=OneWay}">
             <CalendarDatePicker Header="Goes public on (optional)" Date="{x:Bind ViewModel.ScheduleDate, Mode=TwoWay}" PlaceholderText="Not scheduled"

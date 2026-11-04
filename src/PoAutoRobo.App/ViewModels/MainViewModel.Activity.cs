@@ -20,7 +20,7 @@ public partial class MainViewModel
 
     /// <summary>True while a script, a recording pass, a preview, a render or a batch of pictures is running. Only one runs at a time.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(GeneratePictureCommand),
+    [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(MakeFinalPicturesCommand), nameof(GeneratePictureCommand),
         nameof(NarrateAllCommand), nameof(CleanMediaCommand), nameof(CancelActivityCommand), nameof(CreateEpisodeCommand), nameof(AnotherTakeCommand), nameof(MakeDraftCommand),
         nameof(WatchClipCommand), nameof(WatchTeaserCommand), nameof(SuggestNoteCommand), nameof(ApplyNoteCommand),
         nameof(SuggestShotsCommand), nameof(MakeThumbnailsCommand), nameof(UploadCommand), nameof(UploadShortsCommand))]

@@ -42,7 +42,7 @@ public partial class MainViewModel : ObservableObject
             one.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName != nameof(IAsyncRelayCommand.IsRunning)) return;
-                foreach (var command in new IRelayCommand[] { GenerateAllCommand, GeneratePictureCommand, AnotherTakeCommand, MakeDraftCommand })
+                foreach (var command in new IRelayCommand[] { GenerateAllCommand, MakeFinalPicturesCommand, GeneratePictureCommand, AnotherTakeCommand, MakeDraftCommand })
                     command.NotifyCanExecuteChanged();
             };
         _ready = true;
@@ -54,7 +54,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>True once the app knows whether it is running on the live services or on stand-ins.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Notice), nameof(NoticeDetail), nameof(PicturesAvailable), nameof(HostCandidatesCost), nameof(LogoCandidatesCost))]
-    [NotifyCanExecuteChangedFor(nameof(CreateEpisodeCommand), nameof(SuggestShotsCommand), nameof(GenerateAllCommand), nameof(GeneratePictureCommand), nameof(AnotherTakeCommand), nameof(MakeDraftCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateEpisodeCommand), nameof(SuggestShotsCommand), nameof(GenerateAllCommand), nameof(MakeFinalPicturesCommand), nameof(GeneratePictureCommand), nameof(AnotherTakeCommand), nameof(MakeDraftCommand))]
     public partial bool IsConnected { get; set; }
 
     /// <summary>Which services are simulated and why; null when everything is live.</summary>
@@ -226,10 +226,37 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial double EpisodeNumber { get; set; } = 1;
 
-    public Choice<BeatStructure>[] StructureChoices { get; } =
-    [
-        new("Story", BeatStructure.Story), new("Tutorial", BeatStructure.Tutorial), new("Hook first", BeatStructure.HookFirst),
-    ];
+    /// <summary>The shapes the series being worked on can be told in, as the Series step offers them.</summary>
+    public IReadOnlyList<string> StructureLabels => IsKids ? ["Toy review", "Highlights"] : ["Story", "Tutorial", "Hook first"];
+
+    public string StructureTip => IsKids
+        ? "The shape every kids' video follows, so each is told the same way. Toy review: hello, unboxing, play time, what he thinks, bye. Highlights: hello, the best bits of your films, bye."
+        : "The shape every episode of the series follows, so each lesson is told the same way. Story: goal, try, fail, fix, result, recap. Tutorial: concept, setup, demo, recap. Hook first: the best moment, then how it works.";
+
+    // The Lesson step's words, which follow the series: a robot lesson asks what was taught, a kids' video what he plays with.
+
+    public string TaughtHeader => IsKids ? "What he plays with" : "What I taught it";
+
+    public string TaughtPlaceholder => IsKids ? "Opening a surprise egg with a dinosaur inside" : "Walking up three stairs without the handrail";
+
+    public string TaughtTip => IsKids
+        ? "What this video is about: the toy, the game or the outing. A sentence is enough. Ctrl+Enter writes the script."
+        : "What the R1 learned in this episode. A sentence is enough; notes or code also work. Ctrl+Enter writes the script.";
+
+    public string WentWrongHeader => IsKids ? "Funny moments (optional)" : "What went wrong (optional)";
+
+    public string WentWrongPlaceholder => IsKids ? "He tried to feed the dinosaur a crayon" : "It leaned back and sat down on the second step";
+
+    public string WentWrongTip => IsKids
+        ? "A funny or surprising moment or two, in a sentence. It goes to the script writer with the rest, so the video can make the most of it. Leave it empty if you like."
+        : "What went wrong along the way, in a sentence or two. It goes to the script writer with what you taught, so the episode can tell that part of the story. Leave it empty if nothing did.";
+
+    public string FootageTip => IsKids
+        ? "Add films of him playing (2 seconds to 2 minutes each), or drop them here. The script places each one in the beat its note fits."
+        : "Add films of the robot (2 seconds to 2 minutes each), or drop them here. The script places each one in the beat its note fits.";
+
+    /// <summary>What the open episode's lesson is headed with, by its own series.</summary>
+    public string OpenTopicHeading => EpisodeIsKids ? "What he plays with" : "What I taught it";
 
     /// <summary>The shape of the next episode: the series' own, set on the Series step.</summary>
     private BeatStructure NextStructure => _kit.Structure;
@@ -245,8 +272,8 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(EpisodeTitle), nameof(HasEpisode), nameof(Runtime), nameof(Captions),
         nameof(CaptionPresetIndex), nameof(CaptionFontSize), nameof(CaptionStroke), nameof(CaptionsTuned), nameof(CaptionAccent), nameof(HasMusic), nameof(MusicLabel), nameof(EpisodeOffSeriesLook),
-        nameof(ShowLessonForm), nameof(ShowOpenLesson), nameof(OpenTopic), nameof(OpenNumberText), nameof(OpenFilmsText))]
-    [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(UseSeriesLookCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(NarrateAllCommand),
+        nameof(ShowLessonForm), nameof(ShowOpenLesson), nameof(OpenTopic), nameof(OpenNumberText), nameof(OpenFilmsText), nameof(OpenTopicHeading), nameof(EpisodeIsKids), nameof(HasDraftPictures), nameof(DraftPicturesText))]
+    [NotifyCanExecuteChangedFor(nameof(RenderCommand), nameof(SuggestTeasersCommand), nameof(RenderTeasersCommand), nameof(UseSeriesLookCommand), nameof(BuildPreviewCommand), nameof(GenerateAllCommand), nameof(MakeFinalPicturesCommand), nameof(NarrateAllCommand),
         nameof(CleanMediaCommand), nameof(RenameEpisodeCommand), nameof(CopyOpenEpisodeCommand), nameof(ShowOpenEpisodeCommand), nameof(DeleteOpenEpisodeCommand), nameof(MakeDraftCommand), nameof(RemoveMusicCommand),
         nameof(WatchClipCommand), nameof(WatchTeaserCommand), nameof(MakeThumbnailsCommand), nameof(UploadShortsCommand))]
     public partial Episode? Episode { get; set; }

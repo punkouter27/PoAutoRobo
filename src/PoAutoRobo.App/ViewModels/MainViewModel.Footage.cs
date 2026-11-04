@@ -60,12 +60,14 @@ public partial class MainViewModel
     private async Task<FootageSeen?> WatchAsync(string film, string note, CancellationToken ct)
     {
         if (OfflineMessage is not null || !FfmpegAvailable) return null;
-        var saved = await FootageCache.GetOrCreateAsync(["watched", FilmKey(film)], ".json", async path =>
+        // A film watched for the other series is watched again: each looks for different things.
+        var show = CurrentShow;
+        var saved = await FootageCache.GetOrCreateAsync(show == Show.Kids ? ["watched-kids", FilmKey(film)] : ["watched", FilmKey(film)], ".json", async path =>
         {
             var frames = await _builder.FramesAsync(film, FramesToWatch, ct);
             try
             {
-                JsonFile.Save(path, await _scriptWriter.WatchAsync(frames, note, ct) ?? throw new InvalidOperationException("Nothing here can look at pictures."));
+                JsonFile.Save(path, await _scriptWriter.WatchAsync(frames, note, show, ct) ?? throw new InvalidOperationException("Nothing here can look at pictures."));
             }
             finally
             {

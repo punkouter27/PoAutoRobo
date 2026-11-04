@@ -104,7 +104,7 @@ public partial class MainViewModel
         ReleasePreview();
         Preview = null;
         var (episode, folder, progress) = (Episode!, EpisodeFolder!, RenderProgress());
-        Preview = await Task.Run(() => _builder.PreviewAsync(episode, folder, SeriesBrand, progress, ct), ct);
+        Preview = await Task.Run(() => _builder.PreviewAsync(episode, folder, EpisodeBrand, progress, ct), ct);
         SyncCards(); // every clip has now been recorded
     }
 
@@ -119,7 +119,7 @@ public partial class MainViewModel
     private async Task RenderMasterAsync(ExportPreset preset, CancellationToken ct)
     {
         var (episode, folder, captions, progress) = (Episode!, EpisodeFolder!, Captions, RenderProgress());
-        var video = await Task.Run(() => _builder.ExportAsync(episode, folder, preset, captions, SeriesBrand, progress, ct), ct);
+        var video = await Task.Run(() => _builder.ExportAsync(episode, folder, preset, captions, EpisodeBrand, progress, ct), ct);
         LastExport = video;
         SyncCards();
 
@@ -128,7 +128,7 @@ public partial class MainViewModel
         try
         {
             ReportActivity("Writing the title, description and tags to upload with it", 1);
-            var notes = (await _scriptWriter.WritePublishNotesAsync(episode, ct)).InSeries(_kit.ChannelName, episode.Number);
+            var notes = (await _scriptWriter.WritePublishNotesAsync(episode, ct)).InSeries(EpisodeKit.Kit.ChannelName, episode.Number);
             await File.WriteAllTextAsync(Path.ChangeExtension(video, ".description.txt"), PublishPack.Description(notes), ct);
             JsonFile.Save(Path.ChangeExtension(video, NotesExtension), notes); // what the upload form on this step starts from
             withNotes = ", subtitles, thumbnail and upload description";
@@ -138,7 +138,7 @@ public partial class MainViewModel
             ErrorMessage = "The video is finished, but its upload description could not be written. " + Plain(e);
         }
         ShowMaster(video);
-        var bookends = _kit.ChannelName.Trim().Length > 0 ? "" : " It has no intro or outro: give the channel a name on the Series step to add them.";
+        var bookends = EpisodeKit.Kit.ChannelName.Trim().Length > 0 ? "" : " It has no intro or outro: give the channel a name on the Series step to add them.";
         StatusMessage = $"Saved {Path.GetFileName(video)}, with its chapter list{withNotes} beside it.{bookends}";
     }
 
@@ -153,7 +153,7 @@ public partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanMakeDraft))]
     private async Task MakeDraftAsync()
     {
-        var estimate = CostEstimate.For(Episode!, _imageModel, Quality);
+        var estimate = CostEstimate.For(Episode!, _imageModel, Quality, subjectSheet: CurrentVisuals?.NeedsSubjectSheet(Episode!) == true);
         var draw = PicturesAvailable && !estimate.NothingToDo;
         ErrorMessage = null;
         if (draw && OverBudget(estimate.Dollars ?? 0) is { } refusal)
@@ -175,7 +175,7 @@ public partial class MainViewModel
             if (draw)
             {
                 Phase(0.15, 0.55);
-                (_, drawn.Failures, drawn.Halted) = await DrawAllAsync(estimate, ct);
+                (_, drawn.Failures, drawn.Halted) = await DrawAllAsync(estimate, Quality, ct);
             }
             Phase(0.7, 0.3);
             await BuildPreviewNowAsync(ct);
@@ -224,7 +224,7 @@ public partial class MainViewModel
         clip.IsBusy = true;
         try
         {
-            await WatchAsync(clip, (folder, ct) => _builder.ClipPreviewAsync(episode, folder, index, SeriesBrand, ct));
+            await WatchAsync(clip, (folder, ct) => _builder.ClipPreviewAsync(episode, folder, index, EpisodeBrand, ct));
         }
         finally
         {

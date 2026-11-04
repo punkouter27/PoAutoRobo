@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:app="using:PoAutoRobo.App"
+    xmlns:vm="using:PoAutoRobo.App.ViewModels"
     Unloaded="OnUnloaded">
     <!-- Everything the app remembers between runs that is not part of an episode, saved as it is changed. It slides in
          beside the page, which stays in view; a click on the page, Escape or the cross puts it away. -->
@@ -22,7 +23,10 @@
             <StackPanel Padding="16,0,16,16" Spacing="{StaticResource GapSmall}">
                 <TextBlock Text="Pictures" Style="{StaticResource SectionHeading}" />
                 <ToggleSwitch x:Name="DraftPicturesSwitch" Header="Draft-quality pictures" IsOn="{x:Bind ViewModel.DraftPictures, Mode=TwoWay}"
-                              ToolTipService.ToolTip="Draw pictures at low quality: quicker and well under half the price. Turn it off and generate again for the pictures you will publish." />
+                              ToolTipService.ToolTip="Draw pictures at low quality: quicker and well under half the price. Once the draft video is right, Make final pictures on the Preview step draws them again at full quality. FLUX has no cheaper draft, so with it this changes nothing." />
+                <ComboBox x:Name="ImageModelBox" Header="Picture model" HorizontalAlignment="Stretch" Visibility="{x:Bind Services.ShowImageModel, Mode=OneWay}"
+                          ItemsSource="{x:Bind vm:ServicesViewModel.ImageModelChoices}" SelectedIndex="{x:Bind Services.ImageModelIndex, Mode=TwoWay}"
+                          ToolTipService.ToolTip="Which picture model on your Azure AI resource draws the pictures. GPT-image is the standard and has cheaper drafts; choose FLUX.1 Kontext pro when that is the one your resource has. FLUX costs about four cents a picture and can't draw layered pictures. Used from the next time the app starts." />
 
                 <TextBlock Text="Spending" Style="{StaticResource SectionHeading}" />
                 <NumberBox x:Name="BudgetBox" Header="Monthly budget in dollars (0 for none)" Minimum="0" SmallChange="5" LargeChange="20" SpinButtonPlacementMode="Compact" Value="{x:Bind ViewModel.MonthlyBudget, Mode=TwoWay}"
